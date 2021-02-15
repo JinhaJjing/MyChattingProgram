@@ -13,7 +13,7 @@ import java.util.Set;
 
 public class Server {
     Selector selector;
-    Set<SocketChannel> allClient = new HashSet<>(); //ì™œ HashSet?
+    Set<SocketChannel> allClient = new HashSet<>(); //¿Ö HashSet?
 
     private static Server server = new Server();
 
@@ -21,25 +21,27 @@ public class Server {
         return server;
     }
 
+    /* ¿¬°á ¿äÃ»ÁßÀÎ Å¬¶óÀÌ¾ğÆ®¸¦ Ã³¸®
+     */
     void accept(SelectionKey selectionKey) throws IOException {
-        ServerSocketChannel server = (ServerSocketChannel) selectionKey.channel(); //í•´ë‹¹ ìš”ì²­ì— ëŒ€í•œ ì†Œì¼“ ì±„ë„ ìƒì„±
+        ServerSocketChannel server = (ServerSocketChannel) selectionKey.channel(); //ÇØ´ç ¿äÃ»¿¡ ´ëÇÑ ¼ÒÄÏ Ã¤³Î »ı¼º
         SocketChannel clientSocket = server.accept();
 
-        clientSocket.configureBlocking(false);
+        clientSocket.configureBlocking(false); // SelectorÀÇ °ü¸®¸¦ ¹Ş±â À§ÇØ¼­ ³íºí·ÎÅ· Ã¤³Î·Î ¹Ù²ãÁÜ
 
-        allClient.add(clientSocket);
+        allClient.add(clientSocket); // ¿¬°áµÈ Å¬¶óÀÌ¾ğÆ®¸¦ ÄÃ·º¼Ç¿¡ Ãß°¡
 
         Protocol protocol = new Protocol(Protocol.PT_REQ_LOGIN);
 
-        clientSocket.write(ByteBuffer.wrap(protocol.getPacket()));
+        clientSocket.write(ByteBuffer.wrap(protocol.getPacket())); // ¾ÆÀÌµğ¸¦ ÀÔ·Â¹Ş±â À§ÇÑ Ãâ·ÂÀ» ÇØ´ç Ã¤³Î¿¡ ÇØÁÜ
 
-        clientSocket.register(selector, SelectionKey.OP_READ, new ClientInfo());
+        clientSocket.register(selector, SelectionKey.OP_READ, new ClientInfo()); // ¾ÆÀÌµğ¸¦ ÀÔ·Â¹ŞÀ» Â÷·ÊÀÌ¹Ç·Î ÀĞ±â¸ğµå·Î ¼¿·ºÅÍ¿¡ µî·ÏÇØÁÜ
     }
 
     public static void main(String[] args) {
         Server server = Server.getInstance();
 
-        try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable, client channelë“¤ì€ í•´ì œ?
+        try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable, client channelµéÀº ÇØÁ¦?
 
             serverSocket.bind(new InetSocketAddress(15000));
             serverSocket.configureBlocking(false);
@@ -47,37 +49,55 @@ public class Server {
             server.selector = Selector.open();
             serverSocket.register(server.selector, SelectionKey.OP_ACCEPT);
 
-            System.out.println("----------ì„œë²„ ì ‘ì† ì¤€ë¹„ ì™„ë£Œ----------");
+            System.out.println("----------¼­¹ö Á¢¼Ó ÁØºñ ¿Ï·á----------");
 
             ByteBuffer inputBuf = ByteBuffer.allocate(1024);
             ByteBuffer outputBuf = ByteBuffer.allocate(1024);
 
-            // í´ë¼ì´ì–¸íŠ¸ ì ‘ì† ì‹œì‘
+            // Å¬¶óÀÌ¾ğÆ® Á¢¼Ó ½ÃÀÛ
             while (true) {
 
-                server.selector.select(); // ì´ë²¤íŠ¸ ë°œìƒí•  ë•Œê¹Œì§€ ìŠ¤ë ˆë“œ ë¸”ë¡œí‚¹
+                server.selector.select(); // ÀÌº¥Æ® ¹ß»ıÇÒ ¶§±îÁö ½º·¹µå ºí·ÎÅ·
 
                 Iterator<SelectionKey> iterator = server.selector.selectedKeys().iterator();
 
                 while (iterator.hasNext()) {
 
                     SelectionKey key = iterator.next();
-                    iterator.remove(); // ì²˜ë¦¬í•œ í‚¤ëŠ” ì œê±°
+                    iterator.remove(); // Ã³¸®ÇÑ Å°´Â Á¦°Å
 
-                    if (key.isAcceptable()) { // ì—°ê²° ìš”ì²­ ì´ë²¤íŠ¸
+                    if (key.isAcceptable()) { // ¿¬°á ¿äÃ» ÀÌº¥Æ®
                         server.accept(key);
-                    } else if (key.isReadable()) { // í´ë¼ì´ì–¸íŠ¸ -> ì„œë²„ ì´ë²¤íŠ¸
+                    } else if (key.isReadable()) { // Å¬¶óÀÌ¾ğÆ® -> ¼­¹ö ÀÌº¥Æ®
                         SocketChannel readSocket = (SocketChannel) key.channel();
-                        Client client = (Client) key.attachment();
+                        ClientInfo clientInfo = (ClientInfo) key.attachment();
 
                         try { readSocket.read(inputBuf); }
                         catch (Exception e) {
-                            //TODO : ì—°ê²° ëŠê¹€ ì²˜ë¦¬(í‡´ì¥ ì²˜ë¦¬)
+                            //TODO : ¿¬°á ²÷±è Ã³¸®(ÅğÀå Ã³¸®)
                         }
 
-                        // TODO : í˜„ì¬ ì•„ì´ë””ê°€ ì—†ì„ ê²½ìš° ì•„ì´ë”” ë“±ë¡
+                        // TODO : Å¬¶óÀÌ¾ğÆ® µî·ÏÈÄ ÀÔÀå ¸Ş½ÃÁö Ãâ·Â
+                        if(clientInfo.getID().isEmpty()){
+                            inputBuf.limit(inputBuf.position() - 1).position(0);
+                            byte[] b = new byte[inputBuf.limit()];
+                            inputBuf.get(b);
+                            clientInfo.setID(new String(b));
 
-                        // TODO : ì½ì–´ì˜¨ ë°ì´í„°ì™€ ì•„ì´ë”” ì •ë³´ë¥¼ ê²°í•©í•´ ì¶œë ¥í•œ ë²„í¼ ìƒì„±
+                            // ¼­¹ö¿¡ Ãâ·Â
+                            System.out.println(clientInfo.getID() + "´ÔÀÌ ÀÔÀåÇÏ¼Ì½À´Ï´Ù.");
+
+                            // ¸ğµç Å¬¶óÀÌ¾ğÆ®¿¡°Ô ¸Ş¼¼Áö Ãâ·Â
+                            outputBuf.put(clientInfo.getID().getBytes());
+                            for(SocketChannel s : server.allClient) {
+                                outputBuf.flip();
+                                s.write(outputBuf);
+                            }
+
+                            continue;
+                        }
+
+                        // TODO : ÀĞ¾î¿Â µ¥ÀÌÅÍ¿Í ¾ÆÀÌµğ Á¤º¸¸¦ °áÇÕÇØ Ãâ·ÂÇÑ ¹öÆÛ »ı¼º
 
                         inputBuf.clear();
                         outputBuf.clear();
