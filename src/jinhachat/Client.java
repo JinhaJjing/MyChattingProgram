@@ -20,8 +20,7 @@ public class Client {
                 bytes = outbuf.array();
 
                 int packetType = bytes[0];
-
-                //protocol.setPacket(packetType, bytes);
+                protocol.setPacket(packetType, bytes);
 
                 switch (packetType) {
 
@@ -35,7 +34,7 @@ public class Client {
                         System.out.println("ID를 입력해주세요(예 : 진하찡) :");
                         //System.out.println("ID와 채팅방 이름을 입력해주세요(예 : 진하찡/드루와) :");
 
-                        new Thread(() -> {
+                        //new Thread(() -> {
                             // 키보드 입력받을 채널과 저장할 버퍼 생성
                             ReadableByteChannel in = Channels.newChannel(System.in);
                             ByteBuffer inbuf = ByteBuffer.allocate(1024);
@@ -44,21 +43,28 @@ public class Client {
                                 while (true) {
                                     in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
                                     inbuf.flip();
-                                    socketChannel.write(inbuf); // 입력한 내용을 서버로 출력
+                                    String id = new String(inbuf.array());
+
+                                    // 서버로 패킷 전송
+                                    Protocol nprotocol = new Protocol(Protocol.PT_RES_LOGIN);
+                                    nprotocol.setId(id);
+                                    System.out.println("로그인 정보 전송");
+                                    socketChannel.write(ByteBuffer.wrap(nprotocol.getPacket()));
+
                                     inbuf.clear();
                                 }
 
                             } catch (IOException e) {
                                 System.out.println("채팅 불가.");
                             }
-                        }).start();
+                        //}).start();
 
-                        break;
-                    case Protocol.PT_RES_LOGIN:
                         break;
                     case Protocol.PT_LOGIN_RESULT:
-                        break;
 
+                        System.out.println("서버가 로그인 결과 전송");
+                        System.out.println("입장 성공");
+                        break;
                 }
 
                 outbuf.flip();

@@ -7,13 +7,13 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 public class Server {
     Selector selector;
     Set<SocketChannel> allClient = new HashSet<>(); //왜 HashSet?
+    Vector<ClientInfo> clientInfos = new Vector<ClientInfo>(); //클라이언트 정보를 따로 들어야할까?
+    HashMap<String, Vector> chatRoomMap = new HashMap<String, Vector>(); //채팅방
 
     private static Server server = new Server();
 
@@ -69,7 +69,7 @@ public class Server {
                     if (key.isAcceptable()) { // 연결 요청 이벤트
                         server.accept(key);
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
-                        SocketChannel readSocket = (SocketChannel) key.channel();
+                        SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
                         ClientInfo clientInfo = (ClientInfo) key.attachment();
 
                         try { readSocket.read(inputBuf); }
@@ -77,27 +77,53 @@ public class Server {
                             //TODO : 연결 끊김 처리(퇴장 처리)
                         }
 
-                        // TODO : 클라이언트 등록후 입장 메시지 출력
-                        if(clientInfo.getID().isEmpty()){
-                            inputBuf.limit(inputBuf.position() - 1).position(0);
-                            byte[] b = new byte[inputBuf.limit()];
-                            inputBuf.get(b);
-                            clientInfo.setID(new String(b));
+                        Protocol protocol = new Protocol();
+                        byte[] bytes = protocol.getPacket();
 
-                            // 서버에 출력
-                            System.out.println(clientInfo.getID() + "님이 입장하셨습니다.");
+                        inputBuf.rewind();
+                        bytes = inputBuf.array();
 
-                            // 모든 클라이언트에게 메세지 출력
-                            outputBuf.put(clientInfo.getID().getBytes());
-                            for(SocketChannel s : server.allClient) {
-                                outputBuf.flip();
-                                s.write(outputBuf);
-                            }
+                        int packetType = bytes[0];
+                        protocol.setPacket(packetType, bytes);
 
-                            continue;
-                        }
+                        switch (packetType) {
+                            //클라이언트가 로그인 정보 응답 패킷인 경우 (클라이언트의 로그인 정보 전송일 경우)
+                            case Protocol.PT_RES_LOGIN:
 
-                        // TODO : 읽어온 데이터와 아이디 정보를 결합해 출력한 버퍼 생성
+                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
+
+                                inputBuf.limit(inputBuf.position() - 1).position(0);
+                                byte[] b = new byte[inputBuf.limit()];
+                                inputBuf.get(b);
+
+                                // TODO : 이미 있는 ID일 때
+                                if(exist) {
+                                    // 다시 입력 요청
+                                    protocol = new Protocol(Protocol.PT_REQ_LOGIN);
+                                }
+                                else{ // ID생성 및 입장 성공
+                                    clientInfo.setID(new String(b));
+
+                                    protocol = new Protocol(Protocol.PT_LOGIN_RESULT);
+                                    System.out.println(clientInfo.getID() + "님이 입장하셨습니다.");
+
+                                    // 모든 클라이언트에게 입장 메세지 출력
+                                    outputBuf.put((clientInfo.getID()+ "님이 입장하셨습니다.\n").getBytes());
+                                    for (SocketChannel s : server.allClient) {
+                                        outputBuf.flip();
+                                        s.write(outputBuf);
+                                    }
+                                }
+
+                                System.out.println("로그인 처리 결과 전송");
+                                readSocket.write(ByteBuffer.wrap(protocol.getPacket()));
+                                break;
+
+                            // TODO : 읽어온 데이터와 아이디 정보를 결합해 출력한 버퍼 생성
+                            case Protocol.CHAT:
+                                break;
+
+                        }//end switch
 
                         inputBuf.clear();
                         outputBuf.clear();
@@ -105,7 +131,7 @@ public class Server {
                 }
             }
         } catch (
-            IOException e) {
+                IOException e) {
             e.printStackTrace();
         }
     }
