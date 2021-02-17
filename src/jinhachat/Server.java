@@ -11,13 +11,13 @@ import java.util.*;
 
 public class Server {
     Selector selector;
-    Set<SocketChannel> allClient = new HashSet<>(); //왜 HashSet?
+    Set<SocketChannel> allClient = new HashSet<>();
     Vector<ClientInfo> clientInfos = new Vector<ClientInfo>(); //클라이언트 정보를 따로 들어야할까?
     HashMap<String, Vector> chatRoomMap = new HashMap<String, Vector>(); //채팅방
 
     private static Server server = new Server();
 
-    public static Server getInstance(){
+    public static Server getInstance() {
         return server;
     }
 
@@ -41,10 +41,10 @@ public class Server {
     public static void main(String[] args) {
         Server server = Server.getInstance();
 
-        try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable, client channel들은 해제?
+        try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
             serverSocket.bind(new InetSocketAddress(15000));
-            serverSocket.configureBlocking(false);
+            serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 바꿔줌
 
             server.selector = Selector.open();
             serverSocket.register(server.selector, SelectionKey.OP_ACCEPT);
@@ -70,10 +70,10 @@ public class Server {
                         server.accept(key);
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
-                        ClientInfo clientInfo = (ClientInfo) key.attachment();
 
-                        try { readSocket.read(inputBuf); }
-                        catch (Exception e) {
+                        try {
+                            readSocket.read(inputBuf);
+                        } catch (Exception e) {
                             //TODO : 연결 끊김 처리(퇴장 처리)
                         }
 
@@ -92,36 +92,41 @@ public class Server {
 
                                 System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
 
-                                inputBuf.limit(inputBuf.position() - 1).position(0);
-                                byte[] b = new byte[inputBuf.limit()];
-                                inputBuf.get(b);
+                                String id = protocol.getId();
 
-                                // TODO : 이미 있는 ID일 때
-                                if(exist) {
-                                    // 다시 입력 요청
-                                    protocol = new Protocol(Protocol.PT_REQ_LOGIN);
+                                boolean exist = false;
+                                for (ClientInfo client : server.clientInfos) {
+                                    if (client.getID().equals(id)) {
+                                        exist = true;
+
+                                        // 입장 재요청
+                                        protocol.setProtocolType(Protocol.PT_REQ_LOGIN);
+                                        break;
+                                    }
                                 }
-                                else{ // ID생성 및 입장 성공
-                                    clientInfo.setID(new String(b));
+                                if (!exist) { // ID생성 및 입장 성공
+                                    protocol.setProtocolType(Protocol.PT_LOGIN_RESULT);
 
-                                    protocol = new Protocol(Protocol.PT_LOGIN_RESULT);
-                                    System.out.println(clientInfo.getID() + "님이 입장하셨습니다.");
+                                    System.out.println("["+protocol.getId() + "]님이 입장하셨습니다.");
 
+                                    // TODO : 채팅방 클라이언트에게만 입장 메시지 출력
                                     // 모든 클라이언트에게 입장 메세지 출력
-                                    outputBuf.put((clientInfo.getID()+ "님이 입장하셨습니다.\n").getBytes());
+                                    outputBuf.put(ByteBuffer.wrap(protocol.getPacket()));
                                     for (SocketChannel s : server.allClient) {
                                         outputBuf.flip();
                                         s.write(outputBuf);
                                     }
                                 }
+                                else { // 입장 실패
+                                    readSocket.write(ByteBuffer.wrap(protocol.getPacket()));
+                                }
 
                                 System.out.println("로그인 처리 결과 전송");
-                                readSocket.write(ByteBuffer.wrap(protocol.getPacket()));
                                 break;
 
-                            // TODO : 읽어온 데이터와 아이디 정보를 결합해 출력한 버퍼 생성
-                            case Protocol.CHAT:
-                                break;
+                            // TODO : 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
+                            /*case Protocol.CHAT:
+                                break;*/
 
                         }//end switch
 
