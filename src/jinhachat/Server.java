@@ -12,7 +12,7 @@ import java.util.*;
 public class Server {
     Selector selector;
     Set<SocketChannel> allClient = new HashSet<>();
-    Vector<ClientInfo> clientInfos = new Vector<ClientInfo>(); //클라이언트 정보를 따로 들어야할까?
+    Vector<Client> clients = new Vector<Client>(); //클라이언트 정보를 따로 들어야할까?
     HashMap<String, Vector> chatRoomMap = new HashMap<String, Vector>(); //채팅방
 
     private static Server server = new Server();
@@ -31,11 +31,13 @@ public class Server {
 
         allClient.add(clientSocket); // 연결된 클라이언트를 컬렉션에 추가
 
-        Protocol protocol = new Protocol(Protocol.PT_REQ_LOGIN);
+        ProtocolHeader header = new ProtocolHeader();
+        header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
+        header.setBodyLength(0);
+        ByteBuffer outbuf = ByteBuffer.allocate(1024);
+        clientSocket.write(header.packetize(outbuf)); // 아이디를 입력받기 위한 출력을 해당 채널에 해줌
 
-        clientSocket.write(ByteBuffer.wrap(protocol.getPacket())); // 아이디를 입력받기 위한 출력을 해당 채널에 해줌
-
-        clientSocket.register(selector, SelectionKey.OP_READ, new ClientInfo()); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
+        clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
 
     public static void main(String[] args) {
@@ -47,7 +49,7 @@ public class Server {
             serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 바꿔줌
 
             server.selector = Selector.open();
-            serverSocket.register(server.selector, SelectionKey.OP_ACCEPT);
+            serverSocket.register(server.selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
 
             System.out.println("----------서버 접속 준비 완료----------");
 
@@ -59,8 +61,9 @@ public class Server {
 
                 server.selector.select(); // 이벤트 발생할 때까지 스레드 블로킹
 
-                Iterator<SelectionKey> iterator = server.selector.selectedKeys().iterator();
+                Iterator<SelectionKey> iterator = server.selector.selectedKeys().iterator(); // 발생한 이벤트를 가진 채널이 담김
 
+                // 발생한 이벤트들을 담은 Iterator의 이벤트를 하나씩 순서대로 처리
                 while (iterator.hasNext()) {
 
                     SelectionKey key = iterator.next();
@@ -77,37 +80,37 @@ public class Server {
                             //TODO : 연결 끊김 처리(퇴장 처리)
                         }
 
-                        Protocol protocol = new Protocol();
-                        byte[] bytes = protocol.getPacket();
+                        ProtocolHeader header = new ProtocolHeader();
+                        header.parse(inputBuf); //header를 먼저 해석
 
-                        inputBuf.rewind();
-                        bytes = inputBuf.array();
+                        switch (header.getProtocolType()) {
+                            // TODO : 클라이언트가 로그인 정보 응답 패킷인 경우 (클라이언트의 로그인 정보 전송일 경우)
+                            case ENTER_ROOM:
 
-                        int packetType = bytes[0];
-                        protocol.setPacket(packetType, bytes);
+/*                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
 
-                        switch (packetType) {
-                            //클라이언트가 로그인 정보 응답 패킷인 경우 (클라이언트의 로그인 정보 전송일 경우)
-                            case Protocol.PT_RES_LOGIN:
 
-                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
+                                //protocol.body.setID(bytes.toString().trim()); //ex) 홍길동
 
-                                String id = protocol.getId();
+                                String id = protocol.body.getID();
 
                                 boolean exist = false;
-                                for (ClientInfo client : server.clientInfos) {
+                                for (Client client : server.clients) {
                                     if (client.getID().equals(id)) {
                                         exist = true;
 
                                         // 입장 재요청
-                                        protocol.setProtocolType(Protocol.PT_REQ_LOGIN);
+                                        protocol.header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
+                                        protocol.body.setMsg("이미 존재하는 아이디입니다"); //에러 메시지를 메시지 란에 넣기?
                                         break;
                                     }
                                 }
                                 if (!exist) { // ID생성 및 입장 성공
-                                    protocol.setProtocolType(Protocol.PT_LOGIN_RESULT);
+                                    protocol.header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
 
-                                    System.out.println("["+protocol.getId() + "]님이 입장하셨습니다.");
+                                    server.clients.add(new Client(id));
+
+                                    System.out.println("[" + protocol.body.getID() + "]님이 입장하셨습니다.");
 
                                     // TODO : 채팅방 클라이언트에게만 입장 메시지 출력
                                     // 모든 클라이언트에게 입장 메세지 출력
@@ -116,17 +119,16 @@ public class Server {
                                         outputBuf.flip();
                                         s.write(outputBuf);
                                     }
-                                }
-                                else { // 입장 실패
+                                } else { // 입장 실패
                                     readSocket.write(ByteBuffer.wrap(protocol.getPacket()));
                                 }
 
-                                System.out.println("로그인 처리 결과 전송");
+                                System.out.println("로그인 처리 결과 전송");*/
                                 break;
 
                             // TODO : 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
-                            /*case Protocol.CHAT:
-                                break;*/
+                            case SEND_MESSAGE:
+                                break;
 
                         }//end switch
 
