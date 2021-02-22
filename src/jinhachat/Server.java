@@ -10,10 +10,8 @@ import java.nio.channels.SocketChannel;
 import java.util.*;
 
 public class Server {
-    Selector selector;
-    Set<SocketChannel> allClient = new HashSet<>();
-    Vector<Client> clients = new Vector<Client>(); //클라이언트 정보를 따로 들어야할까?
-    HashMap<String, Vector> chatRoomMap = new HashMap<String, Vector>(); //채팅방
+    private Selector selector;
+    private HashMap<SocketChannel, String> allClient = null;
 
     private static Server server = new Server();
 
@@ -28,14 +26,6 @@ public class Server {
         SocketChannel clientSocket = server.accept();
 
         clientSocket.configureBlocking(false); // Selector의 관리를 받기 위해서 논블로킹 채널로 바꿔줌
-
-        allClient.add(clientSocket); // 연결된 클라이언트를 컬렉션에 추가
-
-        ProtocolHeader header = new ProtocolHeader();
-        header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
-        header.setBodyLength(0);
-        ByteBuffer outbuf = ByteBuffer.allocate(1024);
-        clientSocket.write(header.packetize(outbuf)); // 아이디를 입력받기 위한 출력을 해당 채널에 해줌
 
         clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
@@ -71,6 +61,7 @@ public class Server {
 
                     if (key.isAcceptable()) { // 연결 요청 이벤트
                         server.accept(key);
+
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
 
@@ -78,56 +69,61 @@ public class Server {
                             readSocket.read(inputBuf);
                         } catch (Exception e) {
                             //TODO : 연결 끊김 처리(퇴장 처리)
+                            server.allClient.remove(readSocket);
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
                         header.parse(inputBuf); //header를 먼저 해석
 
                         switch (header.getProtocolType()) {
-                            // TODO : 클라이언트가 로그인 정보 응답 패킷인 경우 (클라이언트의 로그인 정보 전송일 경우)
-                            case ENTER_ROOM:
+                            // TODO : 클라이언트의 로그인 정보 전송일 경우
+                            case REQ_LOGIN:
+                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
 
-/*                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
-
-
-                                //protocol.body.setID(bytes.toString().trim()); //ex) 홍길동
-
-                                String id = protocol.body.getID();
+                                byte[] temp = new byte[header.getIDLength()];
+                                inputBuf.get(temp);
+                                String id = new String(temp);
 
                                 boolean exist = false;
-                                for (Client client : server.clients) {
-                                    if (client.getID().equals(id)) {
+                                for (SocketChannel client : server.allClient.keySet()) {
+                                    if (id.equals(server.allClient.get(client))) {
                                         exist = true;
-
-                                        // 입장 재요청
-                                        protocol.header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
-                                        protocol.body.setMsg("이미 존재하는 아이디입니다"); //에러 메시지를 메시지 란에 넣기?
                                         break;
                                     }
                                 }
+
+                                ProtocolHeader nheader = new ProtocolHeader();
+                                ProtocolBody nbody = new ProtocolBody();
+
                                 if (!exist) { // ID생성 및 입장 성공
-                                    protocol.header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
+                                    server.allClient.put(readSocket, id); // 연결된 클라이언트를 컬렉션에 추가
 
-                                    server.clients.add(new Client(id));
+                                    nbody.setID(id);
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS)
+                                            .setIDLength(id.length());
 
-                                    System.out.println("[" + protocol.body.getID() + "]님이 입장하셨습니다.");
-
-                                    // TODO : 채팅방 클라이언트에게만 입장 메시지 출력
                                     // 모든 클라이언트에게 입장 메세지 출력
-                                    outputBuf.put(ByteBuffer.wrap(protocol.getPacket()));
-                                    for (SocketChannel s : server.allClient) {
+                                    outputBuf.put(ByteBuffer.wrap((id+"님이 입장하였습니다.").getBytes()));
+                                    for (SocketChannel client : server.allClient.keySet()) {
                                         outputBuf.flip();
-                                        s.write(outputBuf);
+                                        client.write(outputBuf);
                                     }
-                                } else { // 입장 실패
-                                    readSocket.write(ByteBuffer.wrap(protocol.getPacket()));
+
+                                } else { // TODO : 입장 재요청
+                                    nbody.setMsg("이미 존재하는 아이디입니다");
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL)
+                                            .setMSGLength(nbody.getMsg().length());
                                 }
 
-                                System.out.println("로그인 처리 결과 전송");*/
+                                outputBuf.put(nheader.packetize()).put(nbody.packetize());
+                                readSocket.write(outputBuf);
+
+                                System.out.println("로그인 처리 결과 전송");
                                 break;
 
-                            // TODO : 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
-                            case SEND_MESSAGE:
+                            // TODO : 채팅 메시지일 경우. 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
+                            case REQ_CHAT:
+
                                 break;
 
                         }//end switch

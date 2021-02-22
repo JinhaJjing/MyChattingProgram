@@ -4,17 +4,18 @@ import java.nio.ByteBuffer;
 
 /*
  * 통신의 총 Byte는 16byte이다.
- * |MagicN|Type|Body Length|RESERVED|
-*/
+ * |MagicN|Type|ID Length|ChatRoom Length|RESERVED|
+ */
 
 public class ProtocolHeader {
 
     public enum PROTOCOL_OPT {
-        ENTER_ROOM((byte) 0), //로그인 및 입장
-        ESCAPE_ROOM((byte) 1), //퇴장
-        SEND_MESSAGE((byte) 2), //채팅
-        WHISPER((byte) 3), //귓속말
-        SERVICE_RESPONSE((byte)4); //서버 응답?
+        REQ_LOGIN((byte) 0), //로그인 요청
+        RES_LOGIN_SUCCESS((byte) 1), //로그인 성공
+        RES_LOGIN_FAIL((byte) 2), //로그인 실패
+        REQ_CHAT((byte) 3), //채팅 요청
+        RES_CHAT_SUCCESS((byte) 4), //채팅 성공
+        RES_CHAT_FAIL((byte) 5); //채팅 실패
 
         public static PROTOCOL_OPT valueOf(byte value) {
             for (PROTOCOL_OPT type : PROTOCOL_OPT.values()) {
@@ -25,7 +26,7 @@ public class ProtocolHeader {
 
         private byte value;
 
-        private PROTOCOL_OPT(byte value) {
+        PROTOCOL_OPT(byte value) {
             this.value = value;
         }
 
@@ -39,38 +40,60 @@ public class ProtocolHeader {
 
     private byte magicNumber;
     private PROTOCOL_OPT protocolType;
-    private int bodyLength;
+    private int IDLength = 0;
+    private int MSGLength = 0;
 
     public ProtocolHeader() {
-        setMagicNumber(MAGIC_NUMBER);
     }
 
     public void parse(ByteBuffer byteBuffer) {
         setMagicNumber(byteBuffer.get());
         if (getMagicNumber() != MAGIC_NUMBER) return; //나중에 예외처리
-        setProtocolType(byteBuffer.get());
-        setBodyLength(byteBuffer.getInt());
+        setProtocolType(PROTOCOL_OPT.valueOf(byteBuffer.get()));
+        setIDLength(byteBuffer.getInt());
+        setMSGLength(byteBuffer.getInt());
 
-        while (byteBuffer.position() < HEADER_LENGTH) {
-            byteBuffer.get();
+        if (byteBuffer.position() < HEADER_LENGTH) { //(수정)bytebuffer.get여러개 -> position을 옮기는 방법
+            byteBuffer.position(HEADER_LENGTH);
         }
     }
 
     //전달할 변수들을 ByteBuffer에 저장
-    public ByteBuffer packetize(ByteBuffer byteBuffer) {
-        byteBuffer.put(getMagicNumber());
-        byteBuffer.put(getProtocolType().getValue());
-        byteBuffer.putInt(getBodyLength());
+    public ByteBuffer packetize() { //(수정)매개변수 byteBuffer -> 새로운 버퍼 return
+        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
 
-        //나머지 채우기
-        int reservedBytes = HEADER_LENGTH - byteBuffer.position();
-        byteBuffer.put(new byte[reservedBytes]);
+        byteBuffer.put(getMagicNumber());
+        byteBuffer.put((byte) getProtocolType().ordinal());
+        byteBuffer.putInt(getIDLength());
+        byteBuffer.putInt(getMSGLength());
 
         return byteBuffer;
     }
 
+    private ProtocolHeader(ProtocolHeader builder) {
+        this.magicNumber = MAGIC_NUMBER;
+        this.protocolType = builder.protocolType;
+        this.IDLength = builder.IDLength;
+        this.MSGLength = builder.MSGLength;
+    }
+
     public void setMagicNumber(byte magicNumber) {
         this.magicNumber = magicNumber;
+    }
+
+    public ProtocolHeader setProtocolType(PROTOCOL_OPT protocolType) {
+        this.protocolType = protocolType;
+        return this;
+    }
+
+    public ProtocolHeader setIDLength(int IDLength) {
+        this.IDLength = IDLength;
+        return this;
+    }
+
+    public ProtocolHeader setMSGLength(int MSGLength) {
+        this.MSGLength = MSGLength;
+        return this;
     }
 
     public byte getMagicNumber() {
@@ -81,15 +104,16 @@ public class ProtocolHeader {
         return protocolType;
     }
 
-    public void setProtocolType(byte protocolType) {
-        this.protocolType = PROTOCOL_OPT.valueOf(protocolType);
+    public int getIDLength() {
+        return IDLength;
     }
 
-    public int getBodyLength() {
-        return bodyLength;
+    public int getMSGLength() {
+        return MSGLength;
     }
 
-    public void setBodyLength(int bodyLength) {
-        this.bodyLength = bodyLength;
+    public ProtocolHeader build() {
+        return new ProtocolHeader(this);
     }
+
 }

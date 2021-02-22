@@ -6,39 +6,50 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 
 public class Client {
+    private String ID;
+    private ProtocolBody body = null;
 
-    private String id="";
+    private static Client client = new Client();
 
-    // ID 정보 반환
-    String getID() {
-        return id;
+    public static Client getInstance() {
+        return client;
     }
 
-    public Client(String id) {
-        this.id = id;
+    public String getID() {
+        return ID;
     }
 
-    // ID 입력
-    void setID(String id) {
-        this.id = id;
+    public void setID(String ID) {
+        this.ID = ID;
     }
 
     public static void main(String[] args) {
+        Client client = Client.getInstance();
         Thread systemIn;
-        ProtocolHeader sharedData = new ProtocolHeader();
 
         try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 15000))) {
             WritableByteChannel out = Channels.newChannel(System.out);
             ByteBuffer outbuf = ByteBuffer.allocate(1024);
 
-            boolean isLoggedIn = false;
-            while(!isLoggedIn){
-                //TODO : 키보드 입력(아이디만)
-            }
+            ReadableByteChannel in = Channels.newChannel(System.in);
+            ByteBuffer inbuf = ByteBuffer.allocate(1024);
 
-            //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
-            systemIn = new Thread(new SystemIn(socketChannel, sharedData));
-            systemIn.start();
+            out.write(ByteBuffer.wrap("ID를 입력해주세요(예 : 서진하) :".getBytes()));
+
+            //'입장' 키보드 입력
+            boolean isLoggedIn = false;
+            while (!isLoggedIn) {
+                in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
+                inbuf.flip();
+
+                ProtocolHeader header = new ProtocolHeader()
+                        .setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_LOGIN)
+                        .setIDLength(inbuf.limit() - 1)
+                        .build();
+
+                socketChannel.write(header.packetize());
+                inbuf.clear();
+            }
 
             //서버로부터 온 데이터 읽기
             while (true) {
@@ -49,20 +60,32 @@ public class Client {
                 ProtocolHeader header = new ProtocolHeader();
                 header.parse(outbuf); //HEADER_LENGTH 만큼 읽고 파싱
 
-                switch (header.getProtocolType()) {
-                    //TODO : 요청에 맞게 처리
-                    //header.getBodyLength() 만큼 byte 읽기?
+                byte[] temp = new byte[header.getIDLength()];
+                outbuf.get(temp);
+                String id = new String(temp);
 
-                    case ENTER_ROOM:
-                        System.out.println("ID를 입력해주세요(예 : 서진하) :");
-                        //전송 스레드에 서버가 요청한 값 알림
-                        sharedData.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
+                temp = new byte[header.getMSGLength()];
+                outbuf.get(temp);
+                String responseMSG = new String(temp);
+
+                switch (header.getProtocolType()) {
+                    case RES_LOGIN_SUCCESS:
+                        client.setID(id);
+                        isLoggedIn = true;
+                        //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
+                        systemIn = new Thread(new SystemIn(socketChannel));
+                        systemIn.start();
                         break;
-                    case SERVICE_RESPONSE:
-                        System.out.println("서버가 로그인 결과 전송");
-                        // TODO : 성공이면 isLoggedIn=true; 아니면
-                        System.out.println(body.getID() + "님이 입장하셨습니다.");
+                    //TODO : Fail 처리
+                    case RES_LOGIN_FAIL:
+                        System.out.println(responseMSG);
                         break;
+                    case RES_CHAT_FAIL:
+                        System.out.println(responseMSG);
+                        break;
+                    case RES_CHAT_SUCCESS:
+                        break;
+                    default:
                 }
 
                 outbuf.flip();
@@ -76,19 +99,17 @@ public class Client {
     }
 }
 
-public class SystemIn implements Runnable {
+class SystemIn implements Runnable {
+    Client client = Client.getInstance();
     private SocketChannel socket;
-    private ProtocolHeader sharedData;
 
     // 연결된 소켓 채널과 모니터 출력용 채널을 생성자로 받음
-    SystemIn(SocketChannel socket, ProtocolHeader sharedData) {
+    SystemIn(SocketChannel socket) {
         this.socket = socket;
-        this.sharedData = sharedData;
     }
 
     @Override
     public void run() {
-
         // 키보드 입력받을 채널과 저장할 버퍼 생성
         ReadableByteChannel in = Channels.newChannel(System.in);
         ByteBuffer inbuf = ByteBuffer.allocate(1024);
@@ -98,32 +119,18 @@ public class SystemIn implements Runnable {
                 in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
                 inbuf.flip();
 
-                switch(sharedData.getProtocolType()){
-                    // 로그인 요청 or 재요청
-                    case ENTER_ROOM:
-                        String id = new String(inbuf.array());
-                        // TODO : packetize
+                String msg = new String(inbuf.array());
 
-                        byte[] bodyBytes = bodyJson.marshal(body);
-                        ProtocolHeader header = new ProtocolHeader();
-                        header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.ENTER_ROOM.getValue());
-                        header.setBodyLength(bodyBytes.length);
+                ProtocolHeader header = new ProtocolHeader()
+                        .setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_CHAT)
+                        .setIDLength(client.getID().length())
+                        .setMSGLength(msg.length())
+                        .build();
+                ProtocolBody body = new ProtocolBody();
+                body.setMsg(msg);
 
-                        ByteBuffer byteBuffer = ByteBuffer.allocate(ProtocolHeader.HEADER_LENGTH + bodyBytes.length);
-                        byteBuffer = header.packetize(byteBuffer);
-                        byteBuffer.put(bodyBytes);
-                        byteBuffer.flip();
-
-                        System.out.println("로그인 정보 전송");
-                        socket.write(byteBuffer);
-                        break;
-                    case SEND_MESSAGE:
-                        // TODO : packetize
-                        //String msg = new String(inbuf.array());
-                        //protocol.body.setId(id);
-                        break;
-                }
-
+                inbuf.put(header.packetize()).put(body.packetize());
+                socket.write(inbuf);
                 inbuf.clear();
             }
 
