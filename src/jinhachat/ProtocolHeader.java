@@ -15,7 +15,8 @@ public class ProtocolHeader {
         RES_LOGIN_FAIL((byte) 2), //로그인 실패
         REQ_CHAT((byte) 3), //채팅 요청
         RES_CHAT_SUCCESS((byte) 4), //채팅 성공
-        RES_CHAT_FAIL((byte) 5); //채팅 실패
+        RES_CHAT_FAIL((byte) 5), //채팅 실패
+        BROADCAST((byte)6); //전체 알림/////Is this right?
 
         public static PROTOCOL_OPT valueOf(byte value) {
             for (PROTOCOL_OPT type : PROTOCOL_OPT.values()) {
@@ -35,7 +36,7 @@ public class ProtocolHeader {
         }
     }
 
-    public static final int HEADER_LENGTH = 16;
+    public static final int HEADER_LENGTH = 10;
     private static final byte MAGIC_NUMBER = (byte) 0xAB;
 
     private byte magicNumber;
@@ -44,6 +45,7 @@ public class ProtocolHeader {
     private int MSGLength = 0;
 
     public ProtocolHeader() {
+        this.magicNumber = MAGIC_NUMBER;
     }
 
     public void parse(ByteBuffer byteBuffer) {
@@ -60,18 +62,20 @@ public class ProtocolHeader {
 
     //전달할 변수들을 ByteBuffer에 저장
     public ByteBuffer packetize() { //(수정)매개변수 byteBuffer -> 새로운 버퍼 return
-        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(HEADER_LENGTH);
 
         byteBuffer.put(getMagicNumber());
         byteBuffer.put((byte) getProtocolType().ordinal());
         byteBuffer.putInt(getIDLength());
         byteBuffer.putInt(getMSGLength());
 
+        byteBuffer.flip();
+
         return byteBuffer;
     }
 
     private ProtocolHeader(ProtocolHeader builder) {
-        this.magicNumber = MAGIC_NUMBER;
+        this.magicNumber = builder.MAGIC_NUMBER;
         this.protocolType = builder.protocolType;
         this.IDLength = builder.IDLength;
         this.MSGLength = builder.MSGLength;

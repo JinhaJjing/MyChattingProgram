@@ -11,7 +11,7 @@ import java.util.*;
 
 public class Server {
     private Selector selector;
-    private HashMap<SocketChannel, String> allClient = null;
+    private HashMap<SocketChannel, String> allClient = new HashMap<>();
 
     private static Server server = new Server();
 
@@ -67,6 +67,7 @@ public class Server {
 
                         try {
                             readSocket.read(inputBuf);
+                            inputBuf.flip();
                         } catch (Exception e) {
                             //TODO : 연결 끊김 처리(퇴장 처리)
                             server.allClient.remove(readSocket);
@@ -92,15 +93,16 @@ public class Server {
                                     }
                                 }
 
-                                ProtocolHeader nheader = new ProtocolHeader();
                                 ProtocolBody nbody = new ProtocolBody();
+                                ProtocolHeader nheader = new ProtocolHeader();
 
                                 if (!exist) { // ID생성 및 입장 성공
                                     server.allClient.put(readSocket, id); // 연결된 클라이언트를 컬렉션에 추가
 
-                                    nbody.setID(id);
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS)
-                                            .setIDLength(id.length());
+                                            .setIDLength(id.length())
+                                            .build();
+                                    nbody.setID(id);
 
                                     // 모든 클라이언트에게 입장 메세지 출력
                                     outputBuf.put(ByteBuffer.wrap((id+"님이 입장하였습니다.").getBytes()));
@@ -110,12 +112,16 @@ public class Server {
                                     }
 
                                 } else { // TODO : 입장 재요청
-                                    nbody.setMsg("이미 존재하는 아이디입니다");
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL)
-                                            .setMSGLength(nbody.getMsg().length());
+                                            .setMSGLength(nbody.getMsg().length())
+                                            .build();
                                 }
 
-                                outputBuf.put(nheader.packetize()).put(nbody.packetize());
+                                int bodyLength = nheader.getIDLength() + nheader.getMSGLength();
+                                outputBuf.put(nheader.packetize());
+                                outputBuf.put(nbody.packetize(ByteBuffer.allocate(bodyLength)));
+
+                                outputBuf.flip();
                                 readSocket.write(outputBuf);
 
                                 System.out.println("로그인 처리 결과 전송");
@@ -139,3 +145,4 @@ public class Server {
         }
     }
 }
+

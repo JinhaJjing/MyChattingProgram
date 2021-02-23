@@ -6,13 +6,61 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 
 public class Client {
-    private String ID;
-    private ProtocolBody body = null;
+    String ID;
+    boolean isLoggedIn = false;
 
     private static Client client = new Client();
 
     public static Client getInstance() {
         return client;
+    }
+
+    public static void main(String[] args) {
+        Client client = Client.getInstance();
+        Thread eventHandler;
+
+        try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 15000))) {
+            WritableByteChannel out = Channels.newChannel(System.out);
+
+            ReadableByteChannel in = Channels.newChannel(System.in);
+            ByteBuffer inbuf = ByteBuffer.allocate(1024);
+
+            //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
+            eventHandler = new Thread(new EventHandler(socketChannel));
+            eventHandler.start();
+
+            out.write(ByteBuffer.wrap("ID를 입력해주세요(예 : 서진하) :".getBytes()));
+
+            //'입장' 키보드 입력
+            while (!client.isLoggedIn) {
+                in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
+                inbuf.rewind();
+
+                String id = new String(inbuf.array()).trim();
+
+                ProtocolHeader header = new ProtocolHeader()
+                        .setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_LOGIN)
+                        .setIDLength(id.length())
+                        .build();
+
+                ProtocolBody body = new ProtocolBody();
+                body.setID(id);
+
+                inbuf.clear();
+
+                int bodyLength = header.getIDLength() + header.getMSGLength();
+                inbuf.put(header.packetize());
+                inbuf.put(body.packetize(ByteBuffer.allocate(bodyLength)));
+                inbuf.flip();
+                socketChannel.write(inbuf);
+
+                inbuf.clear();
+            }
+
+        } catch (IOException e) {
+            System.out.println("서버와 연결이 종료되었습니다.");
+            e.printStackTrace();
+        }
     }
 
     public String getID() {
@@ -23,87 +71,21 @@ public class Client {
         this.ID = ID;
     }
 
-    public static void main(String[] args) {
-        Client client = Client.getInstance();
-        Thread systemIn;
-
-        try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 15000))) {
-            WritableByteChannel out = Channels.newChannel(System.out);
-            ByteBuffer outbuf = ByteBuffer.allocate(1024);
-
-            ReadableByteChannel in = Channels.newChannel(System.in);
-            ByteBuffer inbuf = ByteBuffer.allocate(1024);
-
-            out.write(ByteBuffer.wrap("ID를 입력해주세요(예 : 서진하) :".getBytes()));
-
-            //'입장' 키보드 입력
-            boolean isLoggedIn = false;
-            while (!isLoggedIn) {
-                in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
-                inbuf.flip();
-
-                ProtocolHeader header = new ProtocolHeader()
-                        .setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_LOGIN)
-                        .setIDLength(inbuf.limit() - 1)
-                        .build();
-
-                socketChannel.write(header.packetize());
-                inbuf.clear();
-            }
-
-            //서버로부터 온 데이터 읽기
-            while (true) {
-
-                // TODO : read 실패시 처리
-                socketChannel.read(outbuf); // 읽어서 버퍼에 저장
-
-                ProtocolHeader header = new ProtocolHeader();
-                header.parse(outbuf); //HEADER_LENGTH 만큼 읽고 파싱
-
-                byte[] temp = new byte[header.getIDLength()];
-                outbuf.get(temp);
-                String id = new String(temp);
-
-                temp = new byte[header.getMSGLength()];
-                outbuf.get(temp);
-                String responseMSG = new String(temp);
-
-                switch (header.getProtocolType()) {
-                    case RES_LOGIN_SUCCESS:
-                        client.setID(id);
-                        isLoggedIn = true;
-                        //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
-                        systemIn = new Thread(new SystemIn(socketChannel));
-                        systemIn.start();
-                        break;
-                    //TODO : Fail 처리
-                    case RES_LOGIN_FAIL:
-                        System.out.println(responseMSG);
-                        break;
-                    case RES_CHAT_FAIL:
-                        System.out.println(responseMSG);
-                        break;
-                    case RES_CHAT_SUCCESS:
-                        break;
-                    default:
-                }
-
-                outbuf.flip();
-                outbuf.clear();
-            }
-
-        } catch (IOException e) {
-            System.out.println("서버와 연결이 종료되었습니다.");
-            e.printStackTrace();
-        }
+    public boolean isLoggedIn() {
+        return isLoggedIn;
     }
+
+    public void setLoggedIn(boolean loggedIn) {
+        isLoggedIn = loggedIn;
+    }
+
 }
 
 class SystemIn implements Runnable {
-    Client client = Client.getInstance();
+
     private SocketChannel socket;
 
-    // 연결된 소켓 채널과 모니터 출력용 채널을 생성자로 받음
+    // 연결된 소켓 채널을 생성자로 받음
     SystemIn(SocketChannel socket) {
         this.socket = socket;
     }

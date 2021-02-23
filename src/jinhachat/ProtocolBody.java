@@ -6,11 +6,11 @@ public class ProtocolBody {
     private String ID = "";
     private String Msg = "";
 
-    public ByteBuffer packetize() { //(수정)매개변수 byteBuffer -> 새로운 버퍼 return
-        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-
+    public ByteBuffer packetize(ByteBuffer byteBuffer) {
         byteBuffer.put(getID().getBytes());
         byteBuffer.put(getMsg().getBytes());
+
+        byteBuffer.flip();
 
         return byteBuffer;
     }
