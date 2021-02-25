@@ -104,12 +104,17 @@ public class Server {
                                             .build();
                                     nbody.setID(id);
 
-                                    // 모든 클라이언트에게 입장 메세지 출력
-                                    outputBuf.put(ByteBuffer.wrap((id+"님이 입장하였습니다.").getBytes()));
+                                    // TODO : 모든 클라이언트에게 입장 메세지 출력
+/*                                    ProtocolHeader nnheader = new ProtocolHeader()
+                                            .setProtocolType(ProtocolHeader.PROTOCOL_OPT.BROADCAST)
+                                            .setIDLength(id.length())
+                                            .setMSGLength();
+                                    ProtocolBody nnbody = new ProtocolBody();
+                                    outputBuf.put(ByteBuffer.wrap((id + "님이 입장하였습니다.").getBytes()));
                                     for (SocketChannel client : server.allClient.keySet()) {
                                         outputBuf.flip();
                                         client.write(outputBuf);
-                                    }
+                                    }*/
 
                                 } else { // TODO : 입장 재요청
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL)

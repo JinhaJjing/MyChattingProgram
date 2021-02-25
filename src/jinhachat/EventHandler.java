@@ -28,7 +28,7 @@ public class EventHandler extends Thread {
                 ProtocolHeader header = new ProtocolHeader();
                 header.parse(outbuf); //HEADER_LENGTH 만큼 읽고 파싱
 
-                byte[] idTemp = new byte[header.getIDLength()]; //protocolbody에 메소드로 만들어야하나?
+                byte[] idTemp = new byte[header.getIDLength()];
                 outbuf.get(idTemp);
                 String responseID = new String(idTemp);
 
@@ -40,17 +40,17 @@ public class EventHandler extends Thread {
                     case RES_LOGIN_SUCCESS:
                         client.setID(responseID);
                         client.setLoggedIn(true);
+
                         //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
                         Thread systemIn = new Thread(new SystemIn(socket));
                         systemIn.start();
                         break;
                     //TODO : Fail 처리
                     case RES_LOGIN_FAIL:
-                        //out.write(ByteBuffer.wrap("ID를 다!시! 입력해주세요(예 : 서진하) :".getBytes()));
-                        System.out.println("LOGIN FAIL");
+                        //out.write(ByteBuffer.wrap("ID를 다시 입력해주세요(예 : 서진하) :".getBytes()));
                         break;
                     case RES_CHAT_FAIL:
-                        System.out.println("CHAT FAIL");
+                        //System.out.println("CHAT FAIL");
                         break;
                     case RES_CHAT_SUCCESS:
                         break;

@@ -34,7 +34,7 @@ public class Client {
             //'입장' 키보드 입력
             while (!client.isLoggedIn) {
                 in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
-                inbuf.rewind();
+                inbuf.flip();
 
                 String id = new String(inbuf.array()).trim();
 
@@ -82,7 +82,7 @@ public class Client {
 }
 
 class SystemIn implements Runnable {
-
+    Client client = Client.getInstance();
     private SocketChannel socket;
 
     // 연결된 소켓 채널을 생성자로 받음
@@ -98,10 +98,11 @@ class SystemIn implements Runnable {
 
         try {
             while (true) {
+                System.out.print("채팅 : ");
                 in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
                 inbuf.flip();
 
-                String msg = new String(inbuf.array());
+                String msg = new String(inbuf.array()).trim();
 
                 ProtocolHeader header = new ProtocolHeader()
                         .setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_CHAT)
@@ -109,9 +110,15 @@ class SystemIn implements Runnable {
                         .setMSGLength(msg.length())
                         .build();
                 ProtocolBody body = new ProtocolBody();
+                body.setID(client.getID());
                 body.setMsg(msg);
 
-                inbuf.put(header.packetize()).put(body.packetize());
+                inbuf.clear();
+
+                int bodyLength = header.getIDLength() + header.getMSGLength();
+                inbuf.put(header.packetize());
+                inbuf.put(body.packetize(ByteBuffer.allocate(bodyLength)));
+                inbuf.flip();
                 socket.write(inbuf);
                 inbuf.clear();
             }
