@@ -11,7 +11,7 @@ import java.util.*;
 
 public class Server {
     private Selector selector;
-    private Map<SocketChannel, String> allClient = new HashMap<>();
+    private Map<String, SocketChannel> allClient = new HashMap<>(); //몇명까지 허용할것인가?
 
     /* 연결 요청중인 클라이언트를 처리
      */
@@ -61,7 +61,12 @@ public class Server {
                             inputBuf.flip();
                         } catch (Exception e) {
                             //TODO : 연결 끊김 처리(퇴장 처리)
-                            allClient.remove(readSocket);
+                            for (String clientID : allClient.keySet()) {
+                                if (allClient.get(clientID).equals(readSocket)) {
+                                    allClient.remove(clientID);
+                                    break;
+                                }
+                            }
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
@@ -77,18 +82,13 @@ public class Server {
                                 String id = new String(temp);
 
                                 boolean exist = false;
-                                for (SocketChannel client : allClient.keySet()) {
-                                    if (id.equals(allClient.get(client))) {
-                                        exist = true;
-                                        break;
-                                    }
-                                }
+                                if(allClient.containsKey(id)) exist=true;
 
                                 ProtocolBody nbody = new ProtocolBody();
                                 ProtocolHeader nheader = new ProtocolHeader();
 
                                 if (!exist) { // ID생성 및 입장 성공
-                                    allClient.put(readSocket, id); // 연결된 클라이언트를 컬렉션에 추가
+                                    allClient.put(id, readSocket); // 연결된 클라이언트를 컬렉션에 추가
 
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS)
                                             .setIDLength(id.length())
