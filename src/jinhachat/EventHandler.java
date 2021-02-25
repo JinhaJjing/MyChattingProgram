@@ -6,7 +6,6 @@ import java.nio.channels.SocketChannel;
 
 public class EventHandler extends Thread {
 
-    Client client = Client.getInstance();
     private SocketChannel socket;
 
     // 연결된 소켓 채널을 생성자로 받음

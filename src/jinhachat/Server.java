@@ -11,13 +11,7 @@ import java.util.*;
 
 public class Server {
     private Selector selector;
-    private HashMap<SocketChannel, String> allClient = new HashMap<>();
-
-    private static Server server = new Server();
-
-    public static Server getInstance() {
-        return server;
-    }
+    private Map<SocketChannel, String> allClient = new HashMap<>();
 
     /* 연결 요청중인 클라이언트를 처리
      */
@@ -26,20 +20,17 @@ public class Server {
         SocketChannel clientSocket = server.accept();
 
         clientSocket.configureBlocking(false); // Selector의 관리를 받기 위해서 논블로킹 채널로 바꿔줌
-
         clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
 
-    public static void main(String[] args) {
-        Server server = Server.getInstance();
-
+    public void run() {
         try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
             serverSocket.bind(new InetSocketAddress(15000));
             serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 바꿔줌
 
-            server.selector = Selector.open();
-            serverSocket.register(server.selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
+            selector = Selector.open();
+            serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
 
             System.out.println("----------서버 접속 준비 완료----------");
 
@@ -49,9 +40,9 @@ public class Server {
             // 클라이언트 접속 시작
             while (true) {
 
-                server.selector.select(); // 이벤트 발생할 때까지 스레드 블로킹
+                selector.select(); // 이벤트 발생할 때까지 스레드 블로킹
 
-                Iterator<SelectionKey> iterator = server.selector.selectedKeys().iterator(); // 발생한 이벤트를 가진 채널이 담김
+                Iterator<SelectionKey> iterator = selector.selectedKeys().iterator(); // 발생한 이벤트를 가진 채널이 담김
 
                 // 발생한 이벤트들을 담은 Iterator의 이벤트를 하나씩 순서대로 처리
                 while (iterator.hasNext()) {
@@ -60,7 +51,7 @@ public class Server {
                     iterator.remove(); // 처리한 키는 제거
 
                     if (key.isAcceptable()) { // 연결 요청 이벤트
-                        server.accept(key);
+                        accept(key);
 
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
@@ -70,7 +61,7 @@ public class Server {
                             inputBuf.flip();
                         } catch (Exception e) {
                             //TODO : 연결 끊김 처리(퇴장 처리)
-                            server.allClient.remove(readSocket);
+                            allClient.remove(readSocket);
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
@@ -86,8 +77,8 @@ public class Server {
                                 String id = new String(temp);
 
                                 boolean exist = false;
-                                for (SocketChannel client : server.allClient.keySet()) {
-                                    if (id.equals(server.allClient.get(client))) {
+                                for (SocketChannel client : allClient.keySet()) {
+                                    if (id.equals(allClient.get(client))) {
                                         exist = true;
                                         break;
                                     }
@@ -97,7 +88,7 @@ public class Server {
                                 ProtocolHeader nheader = new ProtocolHeader();
 
                                 if (!exist) { // ID생성 및 입장 성공
-                                    server.allClient.put(readSocket, id); // 연결된 클라이언트를 컬렉션에 추가
+                                    allClient.put(readSocket, id); // 연결된 클라이언트를 컬렉션에 추가
 
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS)
                                             .setIDLength(id.length())
@@ -149,5 +140,9 @@ public class Server {
             e.printStackTrace();
         }
     }
-}
 
+    public static void main(String[] args) {
+        Server server = new Server();
+        server.run();
+    }
+}
