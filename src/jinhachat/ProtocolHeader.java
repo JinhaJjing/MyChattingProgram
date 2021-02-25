@@ -3,8 +3,8 @@ package jinhachat;
 import java.nio.ByteBuffer;
 
 /*
- * 통신의 총 Byte는 16byte이다.
- * |MagicN|Type|ID Length|ChatRoom Length|RESERVED|
+ * 통신의 총 Byte는 10byte이다.
+ * |MagicN|Type|ID Length|ChatRoom Length|
  */
 
 public class ProtocolHeader {
@@ -14,9 +14,7 @@ public class ProtocolHeader {
         RES_LOGIN_SUCCESS((byte) 1), //로그인 성공
         RES_LOGIN_FAIL((byte) 2), //로그인 실패
         REQ_CHAT((byte) 3), //채팅 요청
-        RES_CHAT_SUCCESS((byte) 4), //채팅 성공
-        RES_CHAT_FAIL((byte) 5), //채팅 실패
-        BROADCAST((byte)6); //전체 알림/////Is this right?
+        BROADCAST((byte) 4); //전체 알림
 
         public static PROTOCOL_OPT valueOf(byte value) {
             for (PROTOCOL_OPT type : PROTOCOL_OPT.values()) {
