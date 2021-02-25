@@ -23,11 +23,11 @@ public class Server {
         clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
 
-    public void run() {
+    public void serverStart() {
         try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
             serverSocket.bind(new InetSocketAddress(15000));
-            serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 바꿔줌
+            serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 논블로킹으로 바꿔줌
 
             selector = Selector.open();
             serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
@@ -73,7 +73,6 @@ public class Server {
                         header.parse(inputBuf); //header를 먼저 해석
 
                         switch (header.getProtocolType()) {
-                            // TODO : 클라이언트의 로그인 정보 전송일 경우
                             case REQ_LOGIN:
                                 System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
 

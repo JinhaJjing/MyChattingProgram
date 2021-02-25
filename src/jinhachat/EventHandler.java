@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+/*
+* Server에 데이터를 보내고 받아서 처리하는 클래스
+*/
 public class EventHandler extends Thread {
 
     private SocketChannel socket;

@@ -57,7 +57,7 @@ class SystemIn implements Runnable {
     @Override
     public void run() {
         // 키보드 입력받을 채널과 저장할 버퍼 생성
-        ReadableByteChannel in = Channels.newChannel(System.in);
+        ReadableByteChannel in = Channels.newChannel(System.in); //ReadableByteChannel?
         ByteBuffer inbuf = ByteBuffer.allocate(1024);
 
         try {
