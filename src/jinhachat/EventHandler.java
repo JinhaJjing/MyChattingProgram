@@ -7,15 +7,16 @@ import java.nio.channels.SocketChannel;
 public class EventHandler extends Thread {
 
     private SocketChannel socket;
+    private Client client = null;
 
     // 연결된 소켓 채널을 생성자로 받음
-    EventHandler(SocketChannel socket) {
+    EventHandler(SocketChannel socket, Client client) {
         this.socket = socket;
+        this.client = client;
     }
 
     @Override
     public void run() {
-        // 서버에서 온 데이터를 저장할 버퍼 생성
         ByteBuffer outbuf = ByteBuffer.allocate(1024);
 
         try {
@@ -23,7 +24,6 @@ public class EventHandler extends Thread {
                 socket.read(outbuf); // 읽어서 버퍼에 저장
                 outbuf.flip();
 
-                //TODO : builder로 변경
                 ProtocolHeader header = new ProtocolHeader();
                 header.parse(outbuf); //HEADER_LENGTH 만큼 읽고 파싱
 
@@ -37,26 +37,16 @@ public class EventHandler extends Thread {
 
                 switch (header.getProtocolType()) {
                     case RES_LOGIN_SUCCESS:
+                        System.out.print(responseID + "님, 로그인에 성공하였습니다!");
                         client.setID(responseID);
                         client.setLoggedIn(true);
+                        break;
 
-                        //사용자가 채팅 내용을 입력 및 서버로 전송하는 쓰레드 생성 및 시작
-                        Thread systemIn = new Thread(new SystemIn(socket));
-                        systemIn.start();
-                        break;
-                    //TODO : Fail 처리
                     case RES_LOGIN_FAIL:
-                        //out.write(ByteBuffer.wrap("ID를 다시 입력해주세요(예 : 서진하) :".getBytes()));
+                        System.out.print("이미 있는 아이디입니다.");
                         break;
-                    case RES_CHAT_FAIL:
-                        //System.out.println("CHAT FAIL");
-                        break;
-                    case RES_CHAT_SUCCESS:
-                        break;
-                    default:
                 }
 
-                outbuf.flip();
                 outbuf.clear();
             }
 

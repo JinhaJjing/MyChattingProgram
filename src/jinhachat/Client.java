@@ -5,16 +5,16 @@ import java.net.InetSocketAddress;
 import java.nio.channels.*;
 
 public class Client {
-    String ID;
-    boolean isLoggedIn = false;
+    private String ID;
+    private boolean isLoggedIn = false;
 
-    public void run() {
+    public void clientStart() {
         try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 15000))) {
             //EventHandler는 사용자가 키보드 입력과 서버로부터 오는 이벤트를 감지하고 처리
-            Thread eventHandler = new Thread(new EventHandler(socketChannel));
+            Thread eventHandler = new Thread(new EventHandler(socketChannel, this));
             eventHandler.start();
 
-            Thread systemIn = new Thread(new SystemIn(socketChannel));
+            Thread systemIn = new Thread(new SystemIn(socketChannel, this));
             systemIn.start();
 
         } catch (IOException e) {
@@ -41,6 +41,6 @@ public class Client {
 
     public static void main(String[] args) {
         Client client = new Client();
-        client.run();
+        client.clientStart();
     }
 }
