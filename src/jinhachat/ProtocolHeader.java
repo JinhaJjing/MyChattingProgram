@@ -3,8 +3,8 @@ package jinhachat;
 import java.nio.ByteBuffer;
 
 /*
- * 통신의 총 Byte는 10byte이다.
- * |MagicN|Type|ID Length|ChatRoom Length|
+ * 통신의 총 Byte는 16byte이다.
+ * |MagicNumber|Message Type|Body Length|RESERVED|
  */
 
 public class ProtocolHeader {
@@ -13,8 +13,12 @@ public class ProtocolHeader {
         REQ_LOGIN((byte) 0), //로그인 요청
         RES_LOGIN_SUCCESS((byte) 1), //로그인 성공
         RES_LOGIN_FAIL((byte) 2), //로그인 실패
-        REQ_CHAT((byte) 3), //채팅 요청
-        BROADCAST((byte) 4); //전체 알림
+        NOTICE_LOGIN((byte)3), //로그인 알림
+        REQ_CHAT((byte) 4), //채팅 요청
+        NOTICE_CHAT((byte) 5), //전체 알림
+        REQ_WHISPER((byte)6), //귓속말 요청
+        RES_WHISPER_FAIL((byte)7), //귓속말 실패
+        NOTICE_WHISPER((byte)8); //귓속말 알림
 
         public static PROTOCOL_OPT valueOf(byte value) {
             for (PROTOCOL_OPT type : PROTOCOL_OPT.values()) {
@@ -34,13 +38,12 @@ public class ProtocolHeader {
         }
     }
 
-    public static final int HEADER_LENGTH = 10;
+    public static final int HEADER_LENGTH = 16;
     private static final byte MAGIC_NUMBER = (byte) 0xAB;
 
     private byte magicNumber;
     private PROTOCOL_OPT protocolType;
-    private int IDLength = 0;
-    private int MSGLength = 0;
+    private int bodyLength = 0;
 
     public ProtocolHeader() {
         this.magicNumber = MAGIC_NUMBER;
@@ -50,8 +53,7 @@ public class ProtocolHeader {
         setMagicNumber(byteBuffer.get());
         if (getMagicNumber() != MAGIC_NUMBER) return; //나중에 예외처리
         setProtocolType(PROTOCOL_OPT.valueOf(byteBuffer.get()));
-        setIDLength(byteBuffer.getInt());
-        setMSGLength(byteBuffer.getInt());
+        setBodyLength(byteBuffer.getInt());
 
         if (byteBuffer.position() < HEADER_LENGTH) { //(수정)bytebuffer.get여러개 -> position을 옮기는 방법
             byteBuffer.position(HEADER_LENGTH);
@@ -64,8 +66,7 @@ public class ProtocolHeader {
 
         byteBuffer.put(getMagicNumber());
         byteBuffer.put((byte) getProtocolType().ordinal());
-        byteBuffer.putInt(getIDLength());
-        byteBuffer.putInt(getMSGLength());
+        byteBuffer.putInt(getBodyLength());
 
         byteBuffer.flip();
 
@@ -75,8 +76,6 @@ public class ProtocolHeader {
     private ProtocolHeader(ProtocolHeader builder) {
         this.magicNumber = builder.MAGIC_NUMBER;
         this.protocolType = builder.protocolType;
-        this.IDLength = builder.IDLength;
-        this.MSGLength = builder.MSGLength;
     }
 
     public void setMagicNumber(byte magicNumber) {
@@ -88,13 +87,8 @@ public class ProtocolHeader {
         return this;
     }
 
-    public ProtocolHeader setIDLength(int IDLength) {
-        this.IDLength = IDLength;
-        return this;
-    }
-
-    public ProtocolHeader setMSGLength(int MSGLength) {
-        this.MSGLength = MSGLength;
+    public ProtocolHeader setBodyLength(int bodyLength) {
+        this.bodyLength = bodyLength;
         return this;
     }
 
@@ -106,12 +100,8 @@ public class ProtocolHeader {
         return protocolType;
     }
 
-    public int getIDLength() {
-        return IDLength;
-    }
-
-    public int getMSGLength() {
-        return MSGLength;
+    public int getBodyLength() {
+        return bodyLength;
     }
 
     public ProtocolHeader build() {

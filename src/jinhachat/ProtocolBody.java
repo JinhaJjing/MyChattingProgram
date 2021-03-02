@@ -5,10 +5,14 @@ import java.nio.ByteBuffer;
 public class ProtocolBody {
     private String ID = "";
     private String Msg = "";
+    private String ChatRoom = "";
+    private String targetID = "";
 
     public ByteBuffer packetize(ByteBuffer byteBuffer) {
         byteBuffer.put(getID().getBytes());
         byteBuffer.put(getMsg().getBytes());
+        byteBuffer.put(getChatRoom().getBytes());
+        byteBuffer.put(getTargetID().getBytes());
 
         byteBuffer.flip();
 
@@ -29,5 +33,21 @@ public class ProtocolBody {
 
     public void setMsg(String msg) {
         Msg = msg;
+    }
+
+    public String getChatRoom() {
+        return ChatRoom;
+    }
+
+    public void setChatRoom(String chatRoom) {
+        ChatRoom = chatRoom;
+    }
+
+    public String getTargetID() {
+        return targetID;
+    }
+
+    public void setTargetID(String targetID) {
+        this.targetID = targetID;
     }
 }
