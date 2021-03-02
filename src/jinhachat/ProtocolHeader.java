@@ -14,11 +14,12 @@ public class ProtocolHeader {
         RES_LOGIN_SUCCESS((byte) 1), //로그인 성공
         RES_LOGIN_FAIL((byte) 2), //로그인 실패
         NOTICE_LOGIN((byte)3), //로그인 알림
-        REQ_CHAT((byte) 4), //채팅 요청
-        NOTICE_CHAT((byte) 5), //전체 알림
-        REQ_WHISPER((byte)6), //귓속말 요청
-        RES_WHISPER_FAIL((byte)7), //귓속말 실패
-        NOTICE_WHISPER((byte)8); //귓속말 알림
+        NOTICE_EXIT((byte)4), //퇴장 알림
+        REQ_CHAT((byte) 5), //채팅 요청
+        NOTICE_CHAT((byte) 6), //전체 알림
+        REQ_WHISPER((byte)7), //귓속말 요청
+        RES_WHISPER_FAIL((byte)8), //귓속말 실패
+        NOTICE_WHISPER((byte)9); //귓속말 알림
 
         public static PROTOCOL_OPT valueOf(byte value) {
             for (PROTOCOL_OPT type : PROTOCOL_OPT.values()) {
@@ -82,14 +83,12 @@ public class ProtocolHeader {
         this.magicNumber = magicNumber;
     }
 
-    public ProtocolHeader setProtocolType(PROTOCOL_OPT protocolType) {
+    public void setProtocolType(PROTOCOL_OPT protocolType) {
         this.protocolType = protocolType;
-        return this;
     }
 
-    public ProtocolHeader setBodyLength(int bodyLength) {
+    public void setBodyLength(int bodyLength) {
         this.bodyLength = bodyLength;
-        return this;
     }
 
     public byte getMagicNumber() {
@@ -102,10 +101,6 @@ public class ProtocolHeader {
 
     public int getBodyLength() {
         return bodyLength;
-    }
-
-    public ProtocolHeader build() {
-        return new ProtocolHeader(this);
     }
 
 }
