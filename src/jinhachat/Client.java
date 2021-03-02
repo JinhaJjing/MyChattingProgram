@@ -1,12 +1,6 @@
 package jinhachat;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.channels.*;
-
 public class Client {
-    private String ID;
-    private boolean isLoggedIn = false;
 
     public void clientStart() {
         try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 15000))) {
@@ -21,22 +15,6 @@ public class Client {
             System.out.println("서버와 연결이 종료되었습니다.");
             e.printStackTrace();
         }
-    }
-
-    public String getID() {
-        return ID;
-    }
-
-    public void setID(String ID) {
-        this.ID = ID;
-    }
-
-    public boolean isLoggedIn() {
-        return isLoggedIn;
-    }
-
-    public void setLoggedIn(boolean loggedIn) {
-        isLoggedIn = loggedIn;
     }
 
     public static void main(String[] args) {
