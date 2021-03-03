@@ -69,6 +69,9 @@ public class ProtocolHeader {
         byteBuffer.put((byte) getProtocolType().ordinal());
         byteBuffer.putInt(getBodyLength());
 
+        for(int i=0;i<10;i++)
+            byteBuffer.put((byte)0);
+
         byteBuffer.flip();
 
         return byteBuffer;

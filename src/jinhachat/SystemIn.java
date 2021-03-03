@@ -3,38 +3,32 @@ package jinhachat;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
+import java.nio.channels.Pipe;
 import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.SocketChannel;
 
+/*
+ * EventHandler에 키보드 입력값을 보내는 클래스
+ */
 class SystemIn extends Thread {
-    private SocketChannel keyboardSocketChannel;
-    private ClientInfo clientInfo;
+    private Pipe.SinkChannel keyboardToHandlerSinkChannel;
 
     // 연결된 소켓 채널을 생성자로 받음
-    SystemIn(EventHandler eventHandler, ClientInfo clientInfo) {
-        this.keyboardSocketChannel = eventHandler.getKeyboardSocketChannel();
-        this.clientInfo = clientInfo;
+    SystemIn(EventHandler eventHandler) {
+        this.keyboardToHandlerSinkChannel = eventHandler.getKeyboardToHandlerSinkChannel();
     }
 
     @Override
     public void run() {
         // 키보드 입력받을 채널과 저장할 버퍼 생성
-        ReadableByteChannel in = Channels.newChannel(System.in); //ReadableByteChannel?
+        ReadableByteChannel in = Channels.newChannel(System.in);
         ByteBuffer inbuf = ByteBuffer.allocate(1024);
-
+        System.out.println("아이디와 채팅방을 입력해주세요.");
 
         while (true) {
-/*                if (!client.isLoggedIn())
-                    System.out.print("ID를 입력해주세요(예 : 서진하) :");
-                else
-                    System.out.print("채팅 : ");*/
-
             try {
                 in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
                 inbuf.flip();
-
-                keyboardSocketChannel.write(inbuf);
-                //socket.write(makeByPacket(inbuf));
+                keyboardToHandlerSinkChannel.write(inbuf);
                 inbuf.clear();
 
             } catch (IOException e) {
@@ -42,6 +36,4 @@ class SystemIn extends Thread {
             }
         }
     }
-
-
 }
