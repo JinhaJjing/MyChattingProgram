@@ -1,6 +1,6 @@
 package jinhachat;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -10,12 +10,12 @@ import java.nio.channels.SocketChannel;
 import java.util.*;
 
 public class Server {
-    private Selector selector;
-    private Map<String, SocketChannel> allClient = new HashMap<>(); //몇명까지 허용할것인가?
+    private Map<String, ClientInfo> allClient = new HashMap<>(); //<유저ID, 유저정보>
+    private Map<String, List<ClientInfo>> allChatRoom = new HashMap<>(); //<채팅방, 유저ID리스트>
 
     /* 연결 요청중인 클라이언트를 처리
      */
-    void accept(SelectionKey selectionKey) throws IOException {
+    void accept(Selector selector, SelectionKey selectionKey) throws IOException {
         ServerSocketChannel server = (ServerSocketChannel) selectionKey.channel(); //해당 요청에 대한 소켓 채널 생성
         SocketChannel clientSocket = server.accept();
 
@@ -23,13 +23,56 @@ public class Server {
         clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
 
+    private ByteBuffer packetize(ClientInfo nClientInfo) throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+        objectOutputStream.writeObject(nClientInfo);
+        objectOutputStream.flush();
+
+        return ByteBuffer.wrap(byteArrayOutputStream.toByteArray());
+    }
+
+    private void noticeExit(SocketChannel readSocket, ByteBuffer outputBuf) throws IOException {
+        String clientID = "", clientChatRoom = "";
+        for (String ID : allClient.keySet()) {
+            if (allClient.get(ID).getSocketChannel().equals(readSocket)) {
+                allClient.remove(ID);
+                clientID = allClient.get(ID).getID(); //퇴장하는 유저 아이디
+                clientChatRoom = allClient.get(ID).getChatRoom(); //퇴장하는 유저가 속한 채팅방
+                break;
+            }
+        }
+
+        ClientInfo nClientInfo = new ClientInfo();
+        nClientInfo.setMSG(clientID);
+        ByteBuffer body = packetize(nClientInfo);
+
+        ProtocolHeader header = new ProtocolHeader();
+        header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_EXIT);
+        header.setBodyLength(body.limit()); //맞나?
+
+        outputBuf.put(header.packetize());
+        outputBuf.put(body);
+
+        for (String chatRoom : allChatRoom.keySet()) {
+            if (allChatRoom.get(chatRoom).equals(clientChatRoom)) {
+                for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                    outputBuf.flip();
+                    clientInfo.getSocketChannel().write(outputBuf);
+                }
+            }
+        }
+
+        outputBuf.clear();
+    }
+
     public void serverStart() {
         try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
-            serverSocket.bind(new InetSocketAddress(15000));
+            serverSocket.bind(new InetSocketAddress(14000));
             serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 논블로킹으로 바꿔줌
 
-            selector = Selector.open();
+            Selector selector = Selector.open();
             serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
 
             System.out.println("----------서버 접속 준비 완료----------");
@@ -51,7 +94,7 @@ public class Server {
                     iterator.remove(); // 처리한 키는 제거
 
                     if (key.isAcceptable()) { // 연결 요청 이벤트
-                        accept(key);
+                        accept(selector, key);
 
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
@@ -60,13 +103,9 @@ public class Server {
                             readSocket.read(inputBuf);
                             inputBuf.flip();
                         } catch (Exception e) {
-                            //TODO : 연결 끊김 처리(퇴장 처리)
-                            for (String clientID : allClient.keySet()) {
-                                if (allClient.get(clientID).equals(readSocket)) {
-                                    allClient.remove(clientID);
-                                    break;
-                                }
-                            }
+                            //채팅방 클라이언트들에게 퇴장 알림
+                            noticeExit(readSocket, outputBuf);
+                            continue; //다음 while로 가길 바라며
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
@@ -76,54 +115,69 @@ public class Server {
                             case REQ_LOGIN:
                                 System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
 
-                                byte[] temp = new byte[header.getIDLength()];
+                                byte[] temp = new byte[header.getBodyLength()];
                                 inputBuf.get(temp);
-                                String id = new String(temp);
+                                ClientInfo newClientInfo = (ClientInfo) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
 
-                                boolean exist = false;
-                                if(allClient.containsKey(id)) exist=true;
+                                boolean IDexist = false;
+                                if (allClient.containsKey(newClientInfo.getReqID())) IDexist = true;
+                                // TODO : 채팅방 확인 로직
 
-                                ProtocolBody nbody = new ProtocolBody();
                                 ProtocolHeader nheader = new ProtocolHeader();
+                                ClientInfo nClientInfo = new ClientInfo();
 
-                                if (!exist) { // ID생성 및 입장 성공
-                                    allClient.put(id, readSocket); // 연결된 클라이언트를 컬렉션에 추가
+                                if (!IDexist) { // ID생성 및 입장 성공
+                                    nClientInfo.setSocketChannel(readSocket);
+                                    nClientInfo.setID(newClientInfo.getReqID());
+                                    nClientInfo.setChatRoom(newClientInfo.getReqChatRoom());
+                                    nClientInfo.setLoggedIn(true);
 
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS)
-                                            .setIDLength(id.length())
-                                            .build();
-                                    nbody.setID(id);
+                                    allClient.put(newClientInfo.getMSG(), nClientInfo); // 연결된 클라이언트를 컬렉션에 추가
+                                    //TODO : 채팅방 개설
+                                    //allChatRoom.put(nClientInfo.getReqChatRoom(),List<...>);
 
-                                    // TODO : 모든 클라이언트에게 입장 메세지 출력
-/*                                    ProtocolHeader nnheader = new ProtocolHeader()
-                                            .setProtocolType(ProtocolHeader.PROTOCOL_OPT.BROADCAST)
-                                            .setIDLength(id.length())
-                                            .setMSGLength();
-                                    ProtocolBody nnbody = new ProtocolBody();
-                                    outputBuf.put(ByteBuffer.wrap((id + "님이 입장하였습니다.").getBytes()));
-                                    for (SocketChannel client : server.allClient.keySet()) {
-                                        outputBuf.flip();
-                                        client.write(outputBuf);
-                                    }*/
+                                    ByteBuffer body = packetize(nClientInfo);
 
-                                } else { // TODO : 입장 재요청
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL)
-                                            .setMSGLength(nbody.getMsg().length())
-                                            .build();
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
+                                    nheader.setBodyLength(body.limit()); //맞나?
+
+                                    for (String chatRoom : allChatRoom.keySet()) {
+                                        if (allChatRoom.get(chatRoom).equals(newClientInfo.getChatRoom())) {
+                                            for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                                                outputBuf.put(nheader.packetize());
+                                                outputBuf.put(body);
+                                                outputBuf.flip();
+                                                clientInfo.getSocketChannel().write(outputBuf);
+                                                outputBuf.clear();
+                                            }
+                                        }
+                                    }
+
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_LOGIN);
+                                    nheader.setBodyLength(body.limit()); //맞나?
+
+                                    System.out.println(nClientInfo.getID() + "님이 로그인하여 " + nClientInfo.getChatRoom() + "에 입장하였습니다");
+
+                                } else {
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL);
+                                    System.out.println("입장 재요청 전송");
                                 }
 
-                                int bodyLength = nheader.getIDLength() + nheader.getMSGLength();
                                 outputBuf.put(nheader.packetize());
-                                outputBuf.put(nbody.packetize(ByteBuffer.allocate(bodyLength)));
+                                outputBuf.put(packetize(nClientInfo));
 
                                 outputBuf.flip();
                                 readSocket.write(outputBuf);
 
-                                System.out.println("로그인 처리 결과 전송");
                                 break;
 
                             // TODO : 채팅 메시지일 경우. 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
                             case REQ_CHAT:
+
+                                break;
+
+                            // TODO : 귓속말 요청 처리
+                            case REQ_WHISPER:
 
                                 break;
 
@@ -135,7 +189,7 @@ public class Server {
                 }
             }
         } catch (
-                IOException e) {
+                IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
     }

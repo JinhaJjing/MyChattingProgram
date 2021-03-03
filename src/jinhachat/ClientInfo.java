@@ -5,11 +5,13 @@ import java.nio.channels.SocketChannel;
 
 public class ClientInfo implements Serializable {
     private SocketChannel socketChannel;
-    private String ID;
+    private String ID = "";
     private boolean isLoggedIn = false;
-    private String chatRoom;
-    private String MSG;
+    private String chatRoom = "";
+    private String MSG = "";
     private String targetID = "";
+    private String reqID = "";
+    private String reqChatRoom = "";
 
     public SocketChannel getSocketChannel() {
         return socketChannel;
@@ -57,5 +59,21 @@ public class ClientInfo implements Serializable {
 
     public void setTargetID(String targetID) {
         this.targetID = targetID;
+    }
+
+    public void setReqID(String reqID) {
+        this.reqID = reqID;
+    }
+
+    public void setReqChatRoom(String reqChatRoom) {
+        this.reqChatRoom = reqChatRoom;
+    }
+
+    public String getReqID() {
+        return reqID;
+    }
+
+    public String getReqChatRoom() {
+        return reqChatRoom;
     }
 }
