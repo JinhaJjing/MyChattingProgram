@@ -1,17 +1,12 @@
 package jinhachat;
 
-import java.io.Serializable;
 import java.nio.channels.SocketChannel;
 
-public class ClientInfo implements Serializable {
+public class ClientInfo {
     private SocketChannel socketChannel;
+    private String chatRoom = "";
     private String ID = "";
     private boolean isLoggedIn = false;
-    private String chatRoom = "";
-    private String MSG = "";
-    private String targetID = "";
-    private String reqID = "";
-    private String reqChatRoom = "";
 
     public SocketChannel getSocketChannel() {
         return socketChannel;
@@ -19,6 +14,14 @@ public class ClientInfo implements Serializable {
 
     public void setSocketChannel(SocketChannel socketChannel) {
         this.socketChannel = socketChannel;
+    }
+
+    public String getChatRoom() {
+        return chatRoom;
+    }
+
+    public void setChatRoom(String chatRoom) {
+        this.chatRoom = chatRoom;
     }
 
     public String getID() {
@@ -35,45 +38,5 @@ public class ClientInfo implements Serializable {
 
     public void setLoggedIn(boolean loggedIn) {
         isLoggedIn = loggedIn;
-    }
-
-    public String getChatRoom() {
-        return chatRoom;
-    }
-
-    public void setChatRoom(String chatRoom) {
-        this.chatRoom = chatRoom;
-    }
-
-    public String getMSG() {
-        return MSG;
-    }
-
-    public void setMSG(String MSG) {
-        this.MSG = MSG;
-    }
-
-    public String getTargetID() {
-        return targetID;
-    }
-
-    public void setTargetID(String targetID) {
-        this.targetID = targetID;
-    }
-
-    public void setReqID(String reqID) {
-        this.reqID = reqID;
-    }
-
-    public void setReqChatRoom(String reqChatRoom) {
-        this.reqChatRoom = reqChatRoom;
-    }
-
-    public String getReqID() {
-        return reqID;
-    }
-
-    public String getReqChatRoom() {
-        return reqChatRoom;
     }
 }

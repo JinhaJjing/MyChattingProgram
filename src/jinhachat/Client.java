@@ -3,10 +3,8 @@ package jinhachat;
 public class Client {
 
     public void clientStart() {
-        ClientInfo clientInfo = new ClientInfo();
-
         //EventHandler는 사용자가 키보드 입력과 서버로부터 오는 이벤트를 감지하고 처리
-        EventHandler eventHandler = new EventHandler(clientInfo);
+        EventHandler eventHandler = new EventHandler();
         eventHandler.start();
 
         SystemIn systemIn = new SystemIn(eventHandler);

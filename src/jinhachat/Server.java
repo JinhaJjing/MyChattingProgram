@@ -23,10 +23,10 @@ public class Server {
         clientSocket.register(selector, SelectionKey.OP_READ); // 아이디를 입력받을 차례이므로 읽기모드로 셀렉터에 등록해줌
     }
 
-    private ByteBuffer packetize(ClientInfo nClientInfo) throws IOException {
+    private ByteBuffer packetize(ProtocolBody nProtocolBody) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-        objectOutputStream.writeObject(nClientInfo);
+        objectOutputStream.writeObject(nProtocolBody);
         objectOutputStream.flush();
 
         return ByteBuffer.wrap(byteArrayOutputStream.toByteArray());
@@ -36,24 +36,25 @@ public class Server {
         String clientID = "", clientChatRoom = "";
         for (String ID : allClient.keySet()) {
             if (allClient.get(ID).getSocketChannel().equals(readSocket)) {
-                allClient.remove(ID);
                 clientID = allClient.get(ID).getID(); //퇴장하는 유저 아이디
                 clientChatRoom = allClient.get(ID).getChatRoom(); //퇴장하는 유저가 속한 채팅방
+                allClient.remove(ID);
                 break;
             }
         }
 
-        ClientInfo nClientInfo = new ClientInfo();
-        nClientInfo.setMSG(clientID);
-        ByteBuffer body = packetize(nClientInfo);
+        ProtocolBody nProtocolBody = new ProtocolBody();
+        nProtocolBody.setID(clientID);
+        ByteBuffer body = packetize(nProtocolBody);
 
         ProtocolHeader header = new ProtocolHeader();
         header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_EXIT);
-        header.setBodyLength(body.limit()); //맞나?
+        header.setBodyLength(body.limit());
 
         outputBuf.put(header.packetize());
         outputBuf.put(body);
 
+        //채팅방 클라이언트들에게 퇴장을 알림
         for (String chatRoom : allChatRoom.keySet()) {
             if (allChatRoom.get(chatRoom).equals(clientChatRoom)) {
                 for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
@@ -111,68 +112,96 @@ public class Server {
                         ProtocolHeader header = new ProtocolHeader();
                         header.parse(inputBuf); //header를 먼저 해석
 
+                        byte[] temp = new byte[header.getBodyLength()];
+                        inputBuf.get(temp);
+                        ProtocolBody protocolBody = (ProtocolBody) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
+
                         switch (header.getProtocolType()) {
                             case REQ_LOGIN:
                                 System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
-
-                                byte[] temp = new byte[header.getBodyLength()];
-                                inputBuf.get(temp);
-                                ClientInfo newClientInfo = (ClientInfo) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
-
                                 boolean IDexist = false;
-                                if (allClient.containsKey(newClientInfo.getReqID())) IDexist = true;
+                                if (allClient.containsKey(protocolBody.getID())) IDexist = true;
                                 // TODO : 채팅방 확인 로직
 
                                 ProtocolHeader nheader = new ProtocolHeader();
-                                ClientInfo nClientInfo = new ClientInfo();
 
                                 if (!IDexist) { // ID생성 및 입장 성공
+                                    ClientInfo nClientInfo = new ClientInfo();
                                     nClientInfo.setSocketChannel(readSocket);
-                                    nClientInfo.setID(newClientInfo.getReqID());
-                                    nClientInfo.setChatRoom(newClientInfo.getReqChatRoom());
+                                    nClientInfo.setID(protocolBody.getID());
+                                    nClientInfo.setChatRoom(protocolBody.getChatRoom());
                                     nClientInfo.setLoggedIn(true);
 
-                                    allClient.put(newClientInfo.getMSG(), nClientInfo); // 연결된 클라이언트를 컬렉션에 추가
-                                    //TODO : 채팅방 개설
-                                    //allChatRoom.put(nClientInfo.getReqChatRoom(),List<...>);
+                                    allClient.put(protocolBody.getID(), nClientInfo); //연결된 클라이언트에 추가
 
-                                    ByteBuffer body = packetize(nClientInfo);
-
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
-                                    nheader.setBodyLength(body.limit()); //맞나?
-
-                                    for (String chatRoom : allChatRoom.keySet()) {
-                                        if (allChatRoom.get(chatRoom).equals(newClientInfo.getChatRoom())) {
-                                            for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
-                                                outputBuf.put(nheader.packetize());
-                                                outputBuf.put(body);
-                                                outputBuf.flip();
-                                                clientInfo.getSocketChannel().write(outputBuf);
-                                                outputBuf.clear();
+                                    //채팅방에 클라이언트 추가(개설 및 입장)
+                                    List<ClientInfo> list = new ArrayList<>();
+                                    if (allChatRoom.containsKey(protocolBody.getChatRoom())) {
+                                        for (String chatRoom : allChatRoom.keySet()) {
+                                            if (chatRoom.equals(protocolBody.getChatRoom())) {
+                                                list = allChatRoom.get(chatRoom);
+                                                break;
                                             }
                                         }
                                     }
+                                    list.add(nClientInfo);
+                                    allChatRoom.put(protocolBody.getChatRoom(), list);
 
+                                    ByteBuffer body = packetize(protocolBody);
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_LOGIN);
-                                    nheader.setBodyLength(body.limit()); //맞나?
+                                    nheader.setBodyLength(body.limit());
 
-                                    System.out.println(nClientInfo.getID() + "님이 로그인하여 " + nClientInfo.getChatRoom() + "에 입장하였습니다");
+                                    //채팅방 클라이언트들에게 로그인 알림
+                                    for(ClientInfo clientinfo : list){
+                                        outputBuf.put(nheader.packetize());
+                                        outputBuf.put(body);
+                                        outputBuf.flip();
+                                        clientinfo.getSocketChannel().write(outputBuf);
+                                        outputBuf.clear();
+                                    }
+
+                                    //로그인 요청 클라이언트에게 성공 알림
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
+                                    nheader.setBodyLength(body.limit());
+                                    outputBuf.put(nheader.packetize());
+                                    outputBuf.put(body);
+
+                                    System.out.println(protocolBody.getID() + "님이 로그인하여 " + protocolBody.getChatRoom() + "에 입장하였습니다");
 
                                 } else {
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL);
+                                    outputBuf.put(nheader.packetize());
+
                                     System.out.println("입장 재요청 전송");
                                 }
 
-                                outputBuf.put(nheader.packetize());
-                                outputBuf.put(packetize(nClientInfo));
-
                                 outputBuf.flip();
                                 readSocket.write(outputBuf);
-
+                                outputBuf.clear();
                                 break;
 
                             // TODO : 채팅 메시지일 경우. 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
                             case REQ_CHAT:
+                                System.out.println("클라이언트가 채팅를 보냈습니다.");
+
+                                nheader = new ProtocolHeader();
+
+                                ByteBuffer body = packetize(protocolBody);
+                                nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_CHAT);
+                                header.setBodyLength(body.limit());
+
+                                //채팅방 클라이언트들에게 채팅 알림
+                                for (String chatRoom : allChatRoom.keySet()) {
+                                    if (allChatRoom.get(chatRoom).equals(protocolBody.getChatRoom())) {
+                                        for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                                            outputBuf.put(nheader.packetize());
+                                            outputBuf.put(body);
+                                            outputBuf.flip();
+                                            clientInfo.getSocketChannel().write(outputBuf);
+                                            outputBuf.clear();
+                                        }
+                                    }
+                                }
 
                                 break;
 

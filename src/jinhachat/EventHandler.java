@@ -13,13 +13,12 @@ import java.util.Iterator;
  * Server에 데이터를 보내고 받아서 처리하는 클래스
  */
 public class EventHandler extends Thread {
-    private ClientInfo clientInfo;
+    private ClientInfo clientInfo = new ClientInfo();
     private Pipe keyboardAndHandlerPipe = null;
     private Pipe.SourceChannel keyboardToHandlerSourceChannel = null;
 
-    public EventHandler(ClientInfo clientInfo) {
+    public EventHandler() {
         try {
-            this.clientInfo = clientInfo;
             this.keyboardAndHandlerPipe = Pipe.open();
             this.keyboardToHandlerSourceChannel = keyboardAndHandlerPipe.source();
         } catch (IOException e) {
@@ -31,14 +30,14 @@ public class EventHandler extends Thread {
         return keyboardAndHandlerPipe.sink();
     }
 
-    private ByteBuffer packetize(ProtocolHeader header, ClientInfo nClientInfo, ByteBuffer outputBuf) throws IOException {
+    private ByteBuffer packetize(ProtocolHeader header, ProtocolBody nProtocolBody, ByteBuffer outputBuf) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-        objectOutputStream.writeObject(nClientInfo);
+        objectOutputStream.writeObject(nProtocolBody);
         objectOutputStream.flush();
 
         ByteBuffer body = ByteBuffer.wrap(byteArrayOutputStream.toByteArray());
-        header.setBodyLength(body.limit()); //맞나?
+        header.setBodyLength(body.limit());
         outputBuf.put(header.packetize());
         outputBuf.put(body);
         outputBuf.flip();
@@ -83,12 +82,16 @@ public class EventHandler extends Thread {
                             ProtocolHeader header = new ProtocolHeader();
                             header.parse(serverBytebuffer); //HEADER_LENGTH 만큼 읽고 파싱
 
-                            ClientInfo clientInfo = (ClientInfo) new ObjectInputStream(new ByteArrayInputStream(serverBytebuffer.array())).readObject();
-                            this.clientInfo = clientInfo;//맞는지 검토. 정신이 없음
+                            byte[] temp = new byte[header.getBodyLength()];
+                            serverBytebuffer.get(temp);
+                            ProtocolBody protocolBody = (ProtocolBody) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
 
                             switch (header.getProtocolType()) {
                                 case RES_LOGIN_SUCCESS:
-                                    System.out.println(clientInfo.getMSG() + "님, 로그인에 성공하여" + clientInfo.getChatRoom() + "에 입장하였습니다!");
+                                    clientInfo.setLoggedIn(true);
+                                    clientInfo.setID(protocolBody.getID());
+                                    clientInfo.setChatRoom(protocolBody.getChatRoom());
+                                    System.out.println("로그인 성공");
                                     break;
                                 case RES_LOGIN_FAIL:
                                     System.out.println("이미 있는 아이디입니다. 다시 입력해주세요.");
@@ -97,16 +100,16 @@ public class EventHandler extends Thread {
                                     System.out.println("귓속말을 하지 못하였습니다.");
                                     break;
                                 case NOTICE_LOGIN:
-                                    System.out.println(clientInfo.getMSG() + "님이 입장하였습니다.");
+                                    System.out.println(protocolBody.getID() + "님이 입장하였습니다.");
                                     break;
                                 case NOTICE_CHAT:
-                                    System.out.println(clientInfo.getID() + " : ");
+                                    System.out.println(protocolBody.getID() + " : ");
                                     break;
                                 case NOTICE_EXIT:
-                                    System.out.println(clientInfo.getMSG() + "님이 퇴장하였습니다.");
+                                    System.out.println(protocolBody.getMSG() + "님이 퇴장하였습니다.");
                                     break;
                                 case NOTICE_WHISPER:
-                                    System.out.println("[귓속말]" + clientInfo.getID() + " : ");
+                                    System.out.println("[귓속말]" + protocolBody.getID() + " : ");
                                     break;
                             }
 
@@ -122,7 +125,7 @@ public class EventHandler extends Thread {
                             readSocket.read(keyboardByteBuffer);
 
                             ProtocolHeader header = new ProtocolHeader();
-                            ClientInfo nclientInfo = new ClientInfo();
+                            ProtocolBody body = new ProtocolBody();
 
                             byte[] bytes = new byte[keyboardByteBuffer.position()];
                             keyboardByteBuffer.flip();
@@ -130,13 +133,13 @@ public class EventHandler extends Thread {
                             String[] strings = new String(bytes).trim().split("/");
 
                             // ID/채팅방
-                            if (clientInfo.getID() == "") {
+                            if (!clientInfo.isLoggedIn()) {
                                 String id = strings[0];
                                 String chatRoom = strings[1];
 
                                 header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_LOGIN);
-                                nclientInfo.setReqID(id);
-                                nclientInfo.setReqChatRoom(chatRoom);
+                                body.setID(id);
+                                body.setChatRoom(chatRoom);
                             }
                             // 안녕
                             // /귓 홍길동 안녕
@@ -145,11 +148,12 @@ public class EventHandler extends Thread {
                             else {
                                 String message = strings[0];
 
-                                header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_LOGIN);
-                                clientInfo.setMSG(message);
+                                header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_CHAT);
+                                body.setID(clientInfo.getID());
+                                body.setMSG(message);
                             }
 
-                            socketChannel.write(packetize(header, nclientInfo, outputBuf));
+                            socketChannel.write(packetize(header, body, outputBuf));
                             outputBuf.clear();
                         }
                     }
