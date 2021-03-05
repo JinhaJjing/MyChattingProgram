@@ -17,8 +17,9 @@ public class EventHandler extends Thread {
     private Pipe keyboardAndHandlerPipe = null;
     private Pipe.SourceChannel keyboardToHandlerSourceChannel = null;
 
-    public EventHandler() {
+    public EventHandler(ClientInfo clientInfo) {
         try {
+            this.clientInfo = clientInfo;
             this.keyboardAndHandlerPipe = Pipe.open();
             this.keyboardToHandlerSourceChannel = keyboardAndHandlerPipe.source();
         } catch (IOException e) {
@@ -48,9 +49,7 @@ public class EventHandler extends Thread {
     @Override
     public void run() {
         try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 14000))) {
-
             Selector selector = Selector.open();
-
             socketChannel.configureBlocking(false);
             socketChannel.register(selector, SelectionKey.OP_READ);
             this.keyboardToHandlerSourceChannel.configureBlocking(false);
@@ -76,37 +75,41 @@ public class EventHandler extends Thread {
 
                             ByteBuffer serverBytebuffer = ByteBuffer.allocate(1024);
 
+                            //TODO : while문 안으로 read넣기
                             readSocket.read(serverBytebuffer);
                             serverBytebuffer.flip();
 
                             ProtocolHeader header = new ProtocolHeader();
                             header.parse(serverBytebuffer); //HEADER_LENGTH 만큼 읽고 파싱
 
-                            byte[] temp = new byte[header.getBodyLength()];
-                            serverBytebuffer.get(temp);
-                            ProtocolBody protocolBody = (ProtocolBody) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
+                            ProtocolBody protocolBody = null;
+                            if (header.getBodyLength() > 0) {
+                                byte[] temp = new byte[header.getBodyLength()];
+                                serverBytebuffer.get(temp);
+                                protocolBody = (ProtocolBody) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
+                            }
 
                             switch (header.getProtocolType()) {
                                 case RES_LOGIN_SUCCESS:
                                     clientInfo.setLoggedIn(true);
                                     clientInfo.setID(protocolBody.getID());
                                     clientInfo.setChatRoom(protocolBody.getChatRoom());
-                                    System.out.println("로그인 성공");
+                                    System.out.println("[알림]로그인 및 채팅방 입장");
                                     break;
                                 case RES_LOGIN_FAIL:
-                                    System.out.println("이미 있는 아이디입니다. 다시 입력해주세요.");
+                                    System.out.println("[알림]이미 있는 아이디입니다. 다시 입력해주세요.");
                                     break;
                                 case RES_WHISPER_FAIL:
-                                    System.out.println("귓속말을 하지 못하였습니다.");
+                                    System.out.println("[알림]귓속말을 하지 못하였습니다.");
                                     break;
                                 case NOTICE_LOGIN:
-                                    System.out.println(protocolBody.getID() + "님이 입장하였습니다.");
+                                    System.out.println("[알림]" + protocolBody.getID() + "님이 입장하였습니다.");
                                     break;
                                 case NOTICE_CHAT:
-                                    System.out.println(protocolBody.getID() + " : ");
+                                    System.out.println(protocolBody.getID() + " : " + protocolBody.getMSG());
                                     break;
                                 case NOTICE_EXIT:
-                                    System.out.println(protocolBody.getMSG() + "님이 퇴장하였습니다.");
+                                    System.out.println("[알림]" + protocolBody.getID() + "님이 퇴장하였습니다.");
                                     break;
                                 case NOTICE_WHISPER:
                                     System.out.println("[귓속말]" + protocolBody.getID() + " : ");
@@ -114,7 +117,6 @@ public class EventHandler extends Thread {
                             }
 
                             serverBytebuffer.clear();
-
                         }
                         // 키보드에서 수신
                         else if (key.channel() == keyboardToHandlerSourceChannel) {
@@ -159,11 +161,8 @@ public class EventHandler extends Thread {
                     }
                 }
             }
-
         } catch (IOException | ClassNotFoundException e) {
-            System.out.println("\n서버와의 연결을 실패했습니다.");
             e.printStackTrace();
         }
-
     }
 }

@@ -43,6 +43,8 @@ public class Server {
             }
         }
 
+        //TODO : allChatRoom 업데이트(퇴장한 유저 제거)
+
         ProtocolBody nProtocolBody = new ProtocolBody();
         nProtocolBody.setID(clientID);
         ByteBuffer body = packetize(nProtocolBody);
@@ -56,7 +58,7 @@ public class Server {
 
         //채팅방 클라이언트들에게 퇴장을 알림
         for (String chatRoom : allChatRoom.keySet()) {
-            if (allChatRoom.get(chatRoom).equals(clientChatRoom)) {
+            if (chatRoom.equals(clientChatRoom)) {
                 for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
                     outputBuf.flip();
                     clientInfo.getSocketChannel().write(outputBuf);
@@ -76,14 +78,13 @@ public class Server {
             Selector selector = Selector.open();
             serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selector에 수락 모드 channel 등록
 
-            System.out.println("----------서버 접속 준비 완료----------");
+            System.out.println("----------Server booting completed----------");
 
             ByteBuffer inputBuf = ByteBuffer.allocate(1024);
             ByteBuffer outputBuf = ByteBuffer.allocate(1024);
 
             // 클라이언트 접속 시작
             while (true) {
-
                 selector.select(); // 이벤트 발생할 때까지 스레드 블로킹
 
                 Iterator<SelectionKey> iterator = selector.selectedKeys().iterator(); // 발생한 이벤트를 가진 채널이 담김
@@ -100,13 +101,14 @@ public class Server {
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
 
+                        //TODO : while문 안으로 read넣기
                         try {
                             readSocket.read(inputBuf);
                             inputBuf.flip();
                         } catch (Exception e) {
                             //채팅방 클라이언트들에게 퇴장 알림
                             noticeExit(readSocket, outputBuf);
-                            continue; //다음 while로 가길 바라며
+                            continue;
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
@@ -118,10 +120,9 @@ public class Server {
 
                         switch (header.getProtocolType()) {
                             case REQ_LOGIN:
-                                System.out.println("클라이언트가 로그인 정보를 보냈습니다.");
+                                System.out.println("Client send login message.");
                                 boolean IDexist = false;
                                 if (allClient.containsKey(protocolBody.getID())) IDexist = true;
-                                // TODO : 채팅방 확인 로직
 
                                 ProtocolHeader nheader = new ProtocolHeader();
 
@@ -151,28 +152,29 @@ public class Server {
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_LOGIN);
                                     nheader.setBodyLength(body.limit());
 
-                                    //채팅방 클라이언트들에게 로그인 알림
-                                    for(ClientInfo clientinfo : list){
-                                        outputBuf.put(nheader.packetize());
-                                        outputBuf.put(body);
-                                        outputBuf.flip();
-                                        clientinfo.getSocketChannel().write(outputBuf);
-                                        outputBuf.clear();
-                                    }
-
-                                    //로그인 요청 클라이언트에게 성공 알림
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
-                                    nheader.setBodyLength(body.limit());
                                     outputBuf.put(nheader.packetize());
                                     outputBuf.put(body);
 
-                                    System.out.println(protocolBody.getID() + "님이 로그인하여 " + protocolBody.getChatRoom() + "에 입장하였습니다");
+                                    //채팅방 클라이언트들에게 로그인 알림
+                                    for(ClientInfo clientinfo : list){
+                                        outputBuf.flip();
+                                        clientinfo.getSocketChannel().write(outputBuf);
+                                    }
+                                    outputBuf.clear();
+
+                                    //로그인 요청 클라이언트에게 성공 알림
+                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
+                                    outputBuf.put(nheader.packetize());
+                                    body.flip();
+                                    outputBuf.put(body);
+
+                                    System.out.println(protocolBody.getID() + " is logined and entered " + protocolBody.getChatRoom());
 
                                 } else {
                                     nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL);
                                     outputBuf.put(nheader.packetize());
 
-                                    System.out.println("입장 재요청 전송");
+                                    System.out.println("Send login request");
                                 }
 
                                 outputBuf.flip();
@@ -180,29 +182,35 @@ public class Server {
                                 outputBuf.clear();
                                 break;
 
-                            // TODO : 채팅 메시지일 경우. 아이디와 채팅 메시지를 결합한 버퍼 생성 및 작성
                             case REQ_CHAT:
-                                System.out.println("클라이언트가 채팅를 보냈습니다.");
+                                System.out.println("Client send messsage.");
 
                                 nheader = new ProtocolHeader();
 
                                 ByteBuffer body = packetize(protocolBody);
                                 nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_CHAT);
-                                header.setBodyLength(body.limit());
+                                nheader.setBodyLength(body.limit());
 
-                                //채팅방 클라이언트들에게 채팅 알림
-                                for (String chatRoom : allChatRoom.keySet()) {
-                                    if (allChatRoom.get(chatRoom).equals(protocolBody.getChatRoom())) {
-                                        for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
-                                            outputBuf.put(nheader.packetize());
-                                            outputBuf.put(body);
-                                            outputBuf.flip();
-                                            clientInfo.getSocketChannel().write(outputBuf);
-                                            outputBuf.clear();
+                                outputBuf.put(nheader.packetize());
+                                outputBuf.put(body);
+
+                                for (String ID : allClient.keySet()) {
+                                    if (allClient.get(ID).getID().equals(protocolBody.getID())) {
+                                        String curChatRoom = allClient.get(ID).getChatRoom();
+
+                                        //채팅방 클라이언트들에게 채팅 알림
+                                        for (String chatRoom : allChatRoom.keySet()) {
+                                            if (chatRoom.equals(curChatRoom)) {
+                                                for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                                                    outputBuf.flip();
+                                                    clientInfo.getSocketChannel().write(outputBuf);
+                                                }
+                                            }
                                         }
+                                        break;
                                     }
                                 }
-
+                                outputBuf.clear();
                                 break;
 
                             // TODO : 귓속말 요청 처리
