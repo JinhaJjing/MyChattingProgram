@@ -43,8 +43,6 @@ public class Server {
             }
         }
 
-        //TODO : allChatRoom 업데이트(퇴장한 유저 제거)
-
         ProtocolBody nProtocolBody = new ProtocolBody();
         nProtocolBody.setID(clientID);
         ByteBuffer body = packetize(nProtocolBody);
@@ -72,7 +70,7 @@ public class Server {
     public void serverStart() {
         try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
-            serverSocket.bind(new InetSocketAddress(14000));
+            serverSocket.bind(new InetSocketAddress(13000));
             serverSocket.configureBlocking(false); // 기본값은 블로킹이므로 논블로킹으로 바꿔줌
 
             Selector selector = Selector.open();
@@ -101,7 +99,6 @@ public class Server {
                     } else if (key.isReadable()) { // 클라이언트 -> 서버 이벤트
                         SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
 
-                        //TODO : while문 안으로 read넣기
                         try {
                             readSocket.read(inputBuf);
                             inputBuf.flip();

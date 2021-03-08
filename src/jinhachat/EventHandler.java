@@ -48,7 +48,7 @@ public class EventHandler extends Thread {
 
     @Override
     public void run() {
-        try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 14000))) {
+        try (SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 13000))) {
             Selector selector = Selector.open();
             socketChannel.configureBlocking(false);
             socketChannel.register(selector, SelectionKey.OP_READ);
@@ -70,22 +70,25 @@ public class EventHandler extends Thread {
                     if (key.isReadable()) { // {서버 or 키보드} -> 클라이언트 이벤트
 
                         //서버에서 수신
-                        if (key.channel() == socketChannel) {
+                        if (key.channel().equals(socketChannel)) {
                             SocketChannel readSocket = (SocketChannel) key.channel(); // 현재 채널 정보
 
-                            ByteBuffer serverBytebuffer = ByteBuffer.allocate(1024);
+                            ByteBuffer headerBytebuffer = ByteBuffer.allocate(16);
 
-                            //TODO : while문 안으로 read넣기
-                            readSocket.read(serverBytebuffer);
-                            serverBytebuffer.flip();
+                            readSocket.read(headerBytebuffer);
+                            headerBytebuffer.flip();
 
                             ProtocolHeader header = new ProtocolHeader();
-                            header.parse(serverBytebuffer); //HEADER_LENGTH 만큼 읽고 파싱
+                            header.parse(headerBytebuffer); //HEADER_LENGTH 만큼 읽고 파싱
+
+                            ByteBuffer bodyBytebuffer = ByteBuffer.allocate(header.getBodyLength());
+                            readSocket.read(bodyBytebuffer);
+                            bodyBytebuffer.flip();
 
                             ProtocolBody protocolBody = null;
                             if (header.getBodyLength() > 0) {
                                 byte[] temp = new byte[header.getBodyLength()];
-                                serverBytebuffer.get(temp);
+                                bodyBytebuffer.get(temp);
                                 protocolBody = (ProtocolBody) new ObjectInputStream(new ByteArrayInputStream(temp)).readObject();
                             }
 
@@ -116,10 +119,11 @@ public class EventHandler extends Thread {
                                     break;
                             }
 
-                            serverBytebuffer.clear();
+                            bodyBytebuffer.clear();
+                            headerBytebuffer.clear();
                         }
                         // 키보드에서 수신
-                        else if (key.channel() == keyboardToHandlerSourceChannel) {
+                        else if (key.channel().equals(keyboardToHandlerSourceChannel)) {
                             Pipe.SourceChannel readSocket = (Pipe.SourceChannel) key.channel(); // 현재 채널 정보
                             ByteBuffer keyboardByteBuffer = ByteBuffer.allocate(1024);
                             ByteBuffer outputBuf = ByteBuffer.allocate(1024);
