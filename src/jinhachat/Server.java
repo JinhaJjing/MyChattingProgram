@@ -54,15 +54,24 @@ public class Server {
         outputBuf.put(header.packetize());
         outputBuf.put(body);
 
+        List<ClientInfo> list = new ArrayList<>();
+        ClientInfo curClientInfo = null;
         //채팅방 클라이언트들에게 퇴장을 알림
         for (String chatRoom : allChatRoom.keySet()) {
             if (chatRoom.equals(clientChatRoom)) {
+                list = allChatRoom.get(chatRoom);
                 for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                    if (clientInfo.getID().equals(clientID)) {
+                        curClientInfo = clientInfo;
+                        continue;
+                    }
                     outputBuf.flip();
                     clientInfo.getSocketChannel().write(outputBuf);
                 }
             }
         }
+        list.remove(curClientInfo);
+        allChatRoom.put(clientChatRoom, list);
 
         outputBuf.clear();
     }
@@ -153,7 +162,7 @@ public class Server {
                                     outputBuf.put(body);
 
                                     //채팅방 클라이언트들에게 로그인 알림
-                                    for(ClientInfo clientinfo : list){
+                                    for (ClientInfo clientinfo : list) {
                                         outputBuf.flip();
                                         clientinfo.getSocketChannel().write(outputBuf);
                                     }
