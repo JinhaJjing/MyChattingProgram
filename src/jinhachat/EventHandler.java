@@ -97,7 +97,7 @@ public class EventHandler extends Thread {
                                     clientInfo.setLoggedIn(true);
                                     clientInfo.setID(protocolBody.getID());
                                     clientInfo.setChatRoom(protocolBody.getChatRoom());
-                                    System.out.println("[알림]로그인 및 채팅방 입장");
+                                    System.out.println("[알림]'"+clientInfo.getID()+"' 로 로그인 후 '"+clientInfo.getChatRoom()+"' 입장");
                                     break;
                                 case RES_LOGIN_FAIL:
                                     System.out.println("[알림]이미 있는 아이디입니다. 다시 입력해주세요.");
@@ -137,6 +137,7 @@ public class EventHandler extends Thread {
                             keyboardByteBuffer.flip();
                             keyboardByteBuffer.get(bytes);
                             String[] strings = new String(bytes).trim().split("/");
+                            String inputMessage = new String(bytes);
 
                             // ID/채팅방
                             if (!clientInfo.isLoggedIn()) {
@@ -147,16 +148,34 @@ public class EventHandler extends Thread {
                                 body.setID(id);
                                 body.setChatRoom(chatRoom);
                             }
-                            // 안녕
-                            // /귓 홍길동 안녕
-                            // /퇴장
-                            // /채팅방리스트
                             else {
                                 String message = strings[0];
 
-                                header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_CHAT);
-                                body.setID(clientInfo.getID());
-                                body.setMSG(message);
+                                // 귓속말, 퇴장, 채팅방리스트
+                                if (message.equals("")) {
+                                    if(inputMessage.substring(0,1).equals("/")){
+                                        if(inputMessage.substring(1,2).equals("귓")){
+                                            String[] cmdAndMSG = strings[1].trim().split(" ");
+                                            header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_WHISPER);
+                                            body.setID(clientInfo.getID());
+                                            body.setTargetID(cmdAndMSG[1]);
+                                            body.setMSG(new String(bytes).substring(4+cmdAndMSG[1].length()).trim());
+                                        } else if(inputMessage.substring(1,3).equals("퇴장")){
+                                            //TODO : terminate client
+                                        } else if(inputMessage.substring(1,7).equals("채팅방리스트")){
+                                            //TODO : show chatroomlist
+                                        }
+                                        else{
+
+                                        }
+                                    }
+                                }
+                                // 채팅
+                                else {
+                                    header.setProtocolType(ProtocolHeader.PROTOCOL_OPT.REQ_CHAT);
+                                    body.setID(clientInfo.getID());
+                                    body.setMSG(message);
+                                }
                             }
 
                             socketChannel.write(packetize(header, body, outputBuf));

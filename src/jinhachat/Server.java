@@ -10,17 +10,17 @@ import java.nio.channels.SocketChannel;
 import java.util.*;
 
 public class Server {
-    private Map<String, ClientInfo> allClient = new HashMap<>(); //<À¯ÀúID, À¯ÀúÁ¤º¸>
-    private Map<String, List<ClientInfo>> allChatRoom = new HashMap<>(); //<Ã¤ÆÃ¹æ, À¯ÀúID¸®½ºÆ®>
+    private Map<String, ClientInfo> allClient = new HashMap<>(); //<ï¿½ï¿½ï¿½ï¿½ID, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½>
+    private Map<String, List<ClientInfo>> allChatRoom = new HashMap<>(); //<Ã¤ï¿½Ã¹ï¿½, ï¿½ï¿½ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½Æ®>
 
-    /* ¿¬°á ¿äÃ»ÁßÀÎ Å¬¶óÀÌ¾ðÆ®¸¦ Ã³¸®
+    /* ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ Ã³ï¿½ï¿½
      */
     void accept(Selector selector, SelectionKey selectionKey) throws IOException {
-        ServerSocketChannel server = (ServerSocketChannel) selectionKey.channel(); //ÇØ´ç ¿äÃ»¿¡ ´ëÇÑ ¼ÒÄÏ Ã¤³Î »ý¼º
+        ServerSocketChannel server = (ServerSocketChannel) selectionKey.channel(); //ï¿½Ø´ï¿½ ï¿½ï¿½Ã»ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         SocketChannel clientSocket = server.accept();
 
-        clientSocket.configureBlocking(false); // SelectorÀÇ °ü¸®¸¦ ¹Þ±â À§ÇØ¼­ ³íºí·ÎÅ· Ã¤³Î·Î ¹Ù²ãÁÜ
-        clientSocket.register(selector, SelectionKey.OP_READ); // ¾ÆÀÌµð¸¦ ÀÔ·Â¹ÞÀ» Â÷·ÊÀÌ¹Ç·Î ÀÐ±â¸ðµå·Î ¼¿·ºÅÍ¿¡ µî·ÏÇØÁÜ
+        clientSocket.configureBlocking(false); // Selectorï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Þ±ï¿½ ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½ï¿½ï¿½ï¿½Å· Ã¤ï¿½Î·ï¿½ ï¿½Ù²ï¿½ï¿½ï¿½
+        clientSocket.register(selector, SelectionKey.OP_READ); // ï¿½ï¿½ï¿½Ìµï¿½ ï¿½Ô·Â¹ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì¹Ç·ï¿½ ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     }
 
     private ByteBuffer packetize(ProtocolBody nProtocolBody) throws IOException {
@@ -32,12 +32,12 @@ public class Server {
         return ByteBuffer.wrap(byteArrayOutputStream.toByteArray());
     }
 
-    private void noticeExit(SocketChannel readSocket, ByteBuffer outputBuf) throws IOException {
+    private void sendExitNotice(SocketChannel readSocket, ByteBuffer outputBuf) throws IOException {
         String clientID = "", clientChatRoom = "";
         for (String ID : allClient.keySet()) {
             if (allClient.get(ID).getSocketChannel().equals(readSocket)) {
-                clientID = allClient.get(ID).getID(); //ÅðÀåÇÏ´Â À¯Àú ¾ÆÀÌµð
-                clientChatRoom = allClient.get(ID).getChatRoom(); //ÅðÀåÇÏ´Â À¯Àú°¡ ¼ÓÇÑ Ã¤ÆÃ¹æ
+                clientID = allClient.get(ID).getID(); //ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìµï¿½
+                clientChatRoom = allClient.get(ID).getChatRoom(); //ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½Ã¹ï¿½
                 allClient.remove(ID);
                 break;
             }
@@ -56,7 +56,7 @@ public class Server {
 
         List<ClientInfo> list = new ArrayList<>();
         ClientInfo curClientInfo = null;
-        //Ã¤ÆÃ¹æ Å¬¶óÀÌ¾ðÆ®µé¿¡°Ô ÅðÀåÀ» ¾Ë¸²
+        //Ã¤ï¿½Ã¹ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½
         for (String chatRoom : allChatRoom.keySet()) {
             if (chatRoom.equals(clientChatRoom)) {
                 list = allChatRoom.get(chatRoom);
@@ -76,49 +76,174 @@ public class Server {
         outputBuf.clear();
     }
 
+    private void sendLoginRes(SocketChannel readSocket, ProtocolBody protocolBody, ByteBuffer outputBuf) throws IOException {
+        System.out.println("Client send login message.");
+        boolean IDexist = false;
+        if (allClient.containsKey(protocolBody.getID())) IDexist = true;
+
+        ProtocolHeader nheader = new ProtocolHeader();
+
+        if (!IDexist) { // IDï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+            ClientInfo nClientInfo = new ClientInfo();
+            nClientInfo.setSocketChannel(readSocket);
+            nClientInfo.setID(protocolBody.getID());
+            nClientInfo.setChatRoom(protocolBody.getChatRoom());
+            nClientInfo.setLoggedIn(true);
+
+            allClient.put(protocolBody.getID(), nClientInfo); //ï¿½ï¿½ï¿½ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ ï¿½ß°ï¿½
+
+            //Ã¤ï¿½Ã¹æ¿¡ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ß°ï¿½(ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+            List<ClientInfo> list = new ArrayList<>();
+            if (allChatRoom.containsKey(protocolBody.getChatRoom())) {
+                for (String chatRoom : allChatRoom.keySet()) {
+                    if (chatRoom.equals(protocolBody.getChatRoom())) {
+                        list = allChatRoom.get(chatRoom);
+                        break;
+                    }
+                }
+            }
+            list.add(nClientInfo);
+            allChatRoom.put(protocolBody.getChatRoom(), list);
+
+            ByteBuffer body = packetize(protocolBody);
+            nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_LOGIN);
+            nheader.setBodyLength(body.limit());
+
+            outputBuf.put(nheader.packetize());
+            outputBuf.put(body);
+
+            //Ã¤ï¿½Ã¹ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ ï¿½Î±ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½
+            for (ClientInfo clientinfo : list) {
+                if(clientinfo.getID().equals(protocolBody.getID())) continue;
+                outputBuf.flip();
+                clientinfo.getSocketChannel().write(outputBuf);
+            }
+            outputBuf.clear();
+
+            //ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½Ã» Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½
+            nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
+            outputBuf.put(nheader.packetize());
+            body.flip();
+            outputBuf.put(body);
+
+            System.out.println(protocolBody.getID() + " is logined and entered " + protocolBody.getChatRoom());
+
+        } else {
+            nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL);
+            outputBuf.put(nheader.packetize());
+
+            System.out.println("Send login request");
+        }
+
+        outputBuf.flip();
+        readSocket.write(outputBuf);
+    }
+
+    private void sendChatRes(ProtocolBody protocolBody, ByteBuffer outputBuf) throws IOException {
+        System.out.println("Client send messsage.");
+
+        ProtocolHeader nheader = new ProtocolHeader();
+
+        ByteBuffer body = packetize(protocolBody);
+        nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_CHAT);
+        nheader.setBodyLength(body.limit());
+
+        outputBuf.put(nheader.packetize());
+        outputBuf.put(body);
+
+        for (String ID : allClient.keySet()) {
+            if (allClient.get(ID).getID().equals(protocolBody.getID())) {
+                String curChatRoom = allClient.get(ID).getChatRoom();
+
+                //Ã¤ï¿½Ã¹ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ Ã¤ï¿½ï¿½ ï¿½Ë¸ï¿½
+                for (String chatRoom : allChatRoom.keySet()) {
+                    if (chatRoom.equals(curChatRoom)) {
+                        for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                            outputBuf.flip();
+                            clientInfo.getSocketChannel().write(outputBuf);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    private void sendWhisperRes(ProtocolBody protocolBody, ByteBuffer outputBuf) throws IOException{
+        System.out.println("Client send whisper.");
+
+        ProtocolHeader nheader = new ProtocolHeader();
+
+        ByteBuffer body = packetize(protocolBody);
+        nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_WHISPER);
+        nheader.setBodyLength(body.limit());
+
+        outputBuf.put(nheader.packetize());
+        outputBuf.put(body);
+
+        for (String ID : allClient.keySet()) {
+            if (allClient.get(ID).getID().equals(protocolBody.getID())) {
+                String curChatRoom = allClient.get(ID).getChatRoom();
+
+                //Ã¤ï¿½Ã¹ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ Ã¤ï¿½ï¿½ ï¿½Ë¸ï¿½
+                for (String chatRoom : allChatRoom.keySet()) {
+                    if (chatRoom.equals(curChatRoom)) {
+                        for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
+                            if(clientInfo.getID().equals(protocolBody.getTargetID())){
+                                outputBuf.flip();
+                                clientInfo.getSocketChannel().write(outputBuf);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
     public void serverStart() {
         try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) { // implements AutoCloseable
 
             serverSocket.bind(new InetSocketAddress(13000));
-            serverSocket.configureBlocking(false); // ±âº»°ªÀº ºí·ÎÅ·ÀÌ¹Ç·Î ³íºí·ÎÅ·À¸·Î ¹Ù²ãÁÜ
+            serverSocket.configureBlocking(false); // ï¿½âº»ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å·ï¿½Ì¹Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½Å·ï¿½ï¿½ï¿½ï¿½ ï¿½Ù²ï¿½ï¿½ï¿½
 
             Selector selector = Selector.open();
-            serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selector¿¡ ¼ö¶ô ¸ðµå channel µî·Ï
+            serverSocket.register(selector, SelectionKey.OP_ACCEPT); // selectorï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ channel ï¿½ï¿½ï¿½
 
             System.out.println("----------Server booting completed----------");
 
             ByteBuffer inputBuf = ByteBuffer.allocate(1024);
             ByteBuffer outputBuf = ByteBuffer.allocate(1024);
 
-            // Å¬¶óÀÌ¾ðÆ® Á¢¼Ó ½ÃÀÛ
+            // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             while (true) {
-                selector.select(); // ÀÌº¥Æ® ¹ß»ýÇÒ ¶§±îÁö ½º·¹µå ºí·ÎÅ·
+                selector.select(); // ï¿½Ìºï¿½Æ® ï¿½ß»ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å·
 
-                Iterator<SelectionKey> iterator = selector.selectedKeys().iterator(); // ¹ß»ýÇÑ ÀÌº¥Æ®¸¦ °¡Áø Ã¤³ÎÀÌ ´ã±è
+                Iterator<SelectionKey> iterator = selector.selectedKeys().iterator(); // ï¿½ß»ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 
-                // ¹ß»ýÇÑ ÀÌº¥Æ®µéÀ» ´ãÀº IteratorÀÇ ÀÌº¥Æ®¸¦ ÇÏ³ª¾¿ ¼ø¼­´ë·Î Ã³¸®
+                // ï¿½ß»ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Iteratorï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
                 while (iterator.hasNext()) {
 
                     SelectionKey key = iterator.next();
-                    iterator.remove(); // Ã³¸®ÇÑ Å°´Â Á¦°Å
+                    iterator.remove(); // Ã³ï¿½ï¿½ï¿½ï¿½ Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-                    if (key.isAcceptable()) { // ¿¬°á ¿äÃ» ÀÌº¥Æ®
+                    if (key.isAcceptable()) { // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã» ï¿½Ìºï¿½Æ®
                         accept(selector, key);
 
-                    } else if (key.isReadable()) { // Å¬¶óÀÌ¾ðÆ® -> ¼­¹ö ÀÌº¥Æ®
-                        SocketChannel readSocket = (SocketChannel) key.channel(); // ÇöÀç Ã¤³Î Á¤º¸
+                    } else if (key.isReadable()) { // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® -> ï¿½ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ®
+                        SocketChannel readSocket = (SocketChannel) key.channel(); // ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
                         try {
                             readSocket.read(inputBuf);
                             inputBuf.flip();
                         } catch (Exception e) {
-                            //Ã¤ÆÃ¹æ Å¬¶óÀÌ¾ðÆ®µé¿¡°Ô ÅðÀå ¾Ë¸²
-                            noticeExit(readSocket, outputBuf);
+                            //Ã¤ï¿½Ã¹ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½
+                            sendExitNotice(readSocket, outputBuf);
                             continue;
                         }
 
                         ProtocolHeader header = new ProtocolHeader();
-                        header.parse(inputBuf); //header¸¦ ¸ÕÀú ÇØ¼®
+                        header.parse(inputBuf); //headerï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ø¼ï¿½
 
                         byte[] temp = new byte[header.getBodyLength()];
                         inputBuf.get(temp);
@@ -126,104 +251,15 @@ public class Server {
 
                         switch (header.getProtocolType()) {
                             case REQ_LOGIN:
-                                System.out.println("Client send login message.");
-                                boolean IDexist = false;
-                                if (allClient.containsKey(protocolBody.getID())) IDexist = true;
-
-                                ProtocolHeader nheader = new ProtocolHeader();
-
-                                if (!IDexist) { // ID»ý¼º ¹× ÀÔÀå ¼º°ø
-                                    ClientInfo nClientInfo = new ClientInfo();
-                                    nClientInfo.setSocketChannel(readSocket);
-                                    nClientInfo.setID(protocolBody.getID());
-                                    nClientInfo.setChatRoom(protocolBody.getChatRoom());
-                                    nClientInfo.setLoggedIn(true);
-
-                                    allClient.put(protocolBody.getID(), nClientInfo); //¿¬°áµÈ Å¬¶óÀÌ¾ðÆ®¿¡ Ãß°¡
-
-                                    //Ã¤ÆÃ¹æ¿¡ Å¬¶óÀÌ¾ðÆ® Ãß°¡(°³¼³ ¹× ÀÔÀå)
-                                    List<ClientInfo> list = new ArrayList<>();
-                                    if (allChatRoom.containsKey(protocolBody.getChatRoom())) {
-                                        for (String chatRoom : allChatRoom.keySet()) {
-                                            if (chatRoom.equals(protocolBody.getChatRoom())) {
-                                                list = allChatRoom.get(chatRoom);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    list.add(nClientInfo);
-                                    allChatRoom.put(protocolBody.getChatRoom(), list);
-
-                                    ByteBuffer body = packetize(protocolBody);
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_LOGIN);
-                                    nheader.setBodyLength(body.limit());
-
-                                    outputBuf.put(nheader.packetize());
-                                    outputBuf.put(body);
-
-                                    //Ã¤ÆÃ¹æ Å¬¶óÀÌ¾ðÆ®µé¿¡°Ô ·Î±×ÀÎ ¾Ë¸²
-                                    for (ClientInfo clientinfo : list) {
-                                        outputBuf.flip();
-                                        clientinfo.getSocketChannel().write(outputBuf);
-                                    }
-                                    outputBuf.clear();
-
-                                    //·Î±×ÀÎ ¿äÃ» Å¬¶óÀÌ¾ðÆ®¿¡°Ô ¼º°ø ¾Ë¸²
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_SUCCESS);
-                                    outputBuf.put(nheader.packetize());
-                                    body.flip();
-                                    outputBuf.put(body);
-
-                                    System.out.println(protocolBody.getID() + " is logined and entered " + protocolBody.getChatRoom());
-
-                                } else {
-                                    nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.RES_LOGIN_FAIL);
-                                    outputBuf.put(nheader.packetize());
-
-                                    System.out.println("Send login request");
-                                }
-
-                                outputBuf.flip();
-                                readSocket.write(outputBuf);
-                                outputBuf.clear();
+                                sendLoginRes(readSocket, protocolBody, outputBuf);
                                 break;
-
                             case REQ_CHAT:
-                                System.out.println("Client send messsage.");
-
-                                nheader = new ProtocolHeader();
-
-                                ByteBuffer body = packetize(protocolBody);
-                                nheader.setProtocolType(ProtocolHeader.PROTOCOL_OPT.NOTICE_CHAT);
-                                nheader.setBodyLength(body.limit());
-
-                                outputBuf.put(nheader.packetize());
-                                outputBuf.put(body);
-
-                                for (String ID : allClient.keySet()) {
-                                    if (allClient.get(ID).getID().equals(protocolBody.getID())) {
-                                        String curChatRoom = allClient.get(ID).getChatRoom();
-
-                                        //Ã¤ÆÃ¹æ Å¬¶óÀÌ¾ðÆ®µé¿¡°Ô Ã¤ÆÃ ¾Ë¸²
-                                        for (String chatRoom : allChatRoom.keySet()) {
-                                            if (chatRoom.equals(curChatRoom)) {
-                                                for (ClientInfo clientInfo : allChatRoom.get(chatRoom)) {
-                                                    outputBuf.flip();
-                                                    clientInfo.getSocketChannel().write(outputBuf);
-                                                }
-                                            }
-                                        }
-                                        break;
-                                    }
-                                }
-                                outputBuf.clear();
+                                sendChatRes(protocolBody, outputBuf);
                                 break;
-
-                            // TODO : ±Ó¼Ó¸» ¿äÃ» Ã³¸®
+                            // TODO : ï¿½Ó¼Ó¸ï¿½ ï¿½ï¿½Ã» Ã³ï¿½ï¿½
                             case REQ_WHISPER:
 
                                 break;
-
                         }//end switch
 
                         inputBuf.clear();
