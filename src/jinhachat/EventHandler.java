@@ -115,7 +115,7 @@ public class EventHandler extends Thread {
                                     System.out.println("[알림]" + protocolBody.getID() + "님이 퇴장하였습니다.");
                                     break;
                                 case NOTICE_WHISPER:
-                                    System.out.println("[귓속말]" + protocolBody.getID() + " : ");
+                                    System.out.println("[귓속말]" + protocolBody.getID() + " : " + protocolBody.getMSG());
                                     break;
                             }
 

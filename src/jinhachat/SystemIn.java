@@ -27,10 +27,11 @@ class SystemIn extends Thread {
         while (true) {
             try {
                 in.read(inbuf); // 읽어올때까지 블로킹되어 대기상태
-                inbuf.flip();
-                keyboardToHandlerSinkChannel.write(inbuf);
-                inbuf.clear();
-
+                if (inbuf.position() > 0) {
+                    inbuf.flip();
+                    keyboardToHandlerSinkChannel.write(inbuf);
+                    inbuf.clear();
+                }
             } catch (IOException e) {
                 System.out.println("채팅 불가.");
             }

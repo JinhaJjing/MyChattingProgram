@@ -258,7 +258,7 @@ public class Server {
                                 break;
                             // TODO : �ӼӸ� ��û ó��
                             case REQ_WHISPER:
-
+                                sendWhisperRes(protocolBody, outputBuf);
                                 break;
                         }//end switch
 

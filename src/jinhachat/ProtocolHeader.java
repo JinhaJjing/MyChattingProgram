@@ -77,11 +77,6 @@ public class ProtocolHeader {
         return byteBuffer;
     }
 
-    private ProtocolHeader(ProtocolHeader builder) {
-        this.magicNumber = builder.MAGIC_NUMBER;
-        this.protocolType = builder.protocolType;
-    }
-
     public void setMagicNumber(byte magicNumber) {
         this.magicNumber = magicNumber;
     }
